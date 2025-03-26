@@ -112,7 +112,7 @@ function dist2(p1, p2) {
     return dx * dx + dy * dy;
 }
 
-function hough_lines_of_interest(hough) {
+function hough_lines_of_interest0(hough) {
     const lines = [];
     const buckets = [];
     const countings = [];
@@ -125,7 +125,7 @@ function hough_lines_of_interest(hough) {
         }
     }
     countings.sort((a, b) => a - b);
-    const threshold = percetile(0.90, countings);
+    const threshold = percetile(0.50, countings);
     for (let i = 0; i < buckets.length; i += 1) {
         const bucket = buckets[i];
         if (bucket && bucket.length > threshold) {
@@ -202,4 +202,34 @@ function hough_lines_of_interest(hough) {
         // }
     }
     return lines;
+}
+
+function hough_points_of_interest(hough) {
+    const lines = [];
+    const buckets = [];
+    const countings = [];
+
+    for (let i = 0; i < hough.buckets.length; i += 1) {
+        const bucket = hough.buckets[i];
+        if (bucket) {
+            buckets.push(bucket);
+            countings.push(bucket.length);
+        }
+    }
+
+    const result = [];
+
+    countings.sort((a, b) => a - b);
+
+    const threshold = percetile(0.9, countings);
+    for (let i = 0; i < buckets.length; i += 1) {
+        const bucket = buckets[i];
+        if (bucket && bucket.length > threshold) {
+          result.push(bucket);
+        }
+    }
+
+    return result.flat().map((p) => {
+      return { x: p[1], y: p[0] };
+    });
 }

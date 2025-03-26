@@ -2,8 +2,9 @@ const ctx = {
   width: 1,
   height: 1,
   img: null,
-  img2: null,
+  showing_img: null,
   offset: null,
+  points: [],
 };
 
 // Function to retrieve state
@@ -146,10 +147,19 @@ function setup() {
 }
 
 function draw() {
-  if (ctx.img2) {
-    image(ctx.img2, 0, 0);
+  if (ctx.showing_img) {
+    image(ctx.showing_img, 0, 0);
   } else {
     background(220);
+  }
+
+  noFill();
+  strokeWeight(2);
+
+  stroke(122, 244, 158);
+
+  for (const point of ctx.points) {
+    ellipse(point.x, point.y, 10, 10);
   }
 }
 
@@ -159,7 +169,12 @@ function isAround(x, value, p) {
 
 function testColor(r, g, b) {
   const v = 0.1;
-  return isAround(r, 0xf2, v) && isAround(g, 0x78, v) && isAround(b, 0x6b, v);
+
+    // ea4335
+    // e27a69
+    // e37867
+  return isAround(r, 0xea, v) && isAround(g, 0x43, v) && isAround(b, 0x35, v);
+  // return isAround(r, 0xf2, v) && isAround(g, 0x78, v) && isAround(b, 0x6b, v);
 }
 
 function loadP5Image({ width, height, pixels }) {
@@ -180,18 +195,12 @@ function loadP5Image({ width, height, pixels }) {
     max_y: 0,
   };
 
-  const numPixels = 4 * width * height;
+  let numPixels = 4 * width * height;
 
   let j = 0;
 
   for (let i = 0; i < numPixels; i += 4) {
-    // img2.pixels[i + 3] = 255;
-
     if (testColor(ctx.img.pixels[i], ctx.img.pixels[i + 1], ctx.img.pixels[i + 2])) {
-      // img2.pixels[i] = 0;
-      // img2.pixels[i + 1] = 0;
-      // img2.pixels[i + 2] = 0;
-
       const x = j % width;
       const y = Math.floor(j / width);
 
@@ -210,11 +219,6 @@ function loadP5Image({ width, height, pixels }) {
       if (y > bounds.max_y) {
         bounds.max_y = y;
       }
-
-    } else {
-      // img2.pixels[i] = 0xff;
-      // img2.pixels[i + 1] = 0xff;
-      // img2.pixels[i + 2] = 0xff;
     }
 
     j += 1;
@@ -229,11 +233,9 @@ function loadP5Image({ width, height, pixels }) {
     y: bounds.min_y - pad,
   };
 
-  ctx.img2 = createImage(dw + 2 * pad, dh + 2 * pad);
+  const img2 = createImage(dw + 2 * pad, dh + 2 * pad);
 
-  ctx.img2.loadPixels();
-  
-  ctx.img2.blend(
+  img2.blend(
     ctx.img,
     ctx.offset.x,
     ctx.offset.y,
@@ -247,15 +249,56 @@ function loadP5Image({ width, height, pixels }) {
     ADD
   );
 
-  // ctx.img2.updatePixels();
+  img2.loadPixels();
 
-  // ctx.width = 960;
-  // ctx.height = ctx.width * height / width | 0;
-  ctx.width = ctx.img2.width;
-  ctx.height = ctx.img2.height;
+  numPixels = 4 * img2.width * img2.height;
 
-  // ctx.img2.resize(ctx.width, ctx.height);
-  // ctx.img2.updatePixels();
+  // Black and white pixels used by hough algorithm
+  const bw_pixels = new Array(numPixels);
+  // let img3 = createImage(img2.width, img2.height);
+  // img3.loadPixels();
+
+  for (let i = 0; i < numPixels; i += 4) {
+    bw_pixels[i + 3] = 255;
+    // img3.pixels[i + 3] = 255;
+
+    if (testColor(img2.pixels[i], img2.pixels[i + 1], img2.pixels[i + 2])) {
+      bw_pixels[i] = 0;
+      bw_pixels[i + 1] = 0;
+      bw_pixels[i + 2] = 0;
+
+      // img3.pixels[i] = 0;
+      // img3.pixels[i + 1] = 0;
+      // img3.pixels[i + 2] = 0;
+
+    } else {
+      bw_pixels[i] = 0xff;
+      bw_pixels[i + 1] = 0xff;
+      bw_pixels[i + 2] = 0xff;
+
+      // img3.pixels[i] = 0xff;
+      // img3.pixels[i + 1] = 0xff;
+      // img3.pixels[i + 2] = 0xff;
+    }
+  }
+
+  // img3.updatePixels();
+
+  const hough = hough_create(bw_pixels, img2.width, img2.height);
+
+  hough_proccess(hough);
+
+  // const lines = hough_lines_of_interest0(hough);
+
+  // ctx.points = lines.flat();
+
+  ctx.points = hough_points_of_interest(hough);
+
+  ctx.width = img2.width;
+  ctx.height = img2.height;
+
+  ctx.showing_img = img2;
+  // ctx.showing_img = img3;
 
   resizeCanvas(ctx.width, ctx.height);
 }
