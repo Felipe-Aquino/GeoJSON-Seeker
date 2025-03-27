@@ -177,6 +177,46 @@ function testColor(r, g, b) {
   // return isAround(r, 0xf2, v) && isAround(g, 0x78, v) && isAround(b, 0x6b, v);
 }
 
+function pt_dist2(p1, p2) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    return dx * dx + dy * dy;
+}
+
+function swap_remove(arr, size, at) {
+  const aux = arr[at];
+  arr[at] = arr[size - 1];
+  arr[size - 1] = aux;
+
+  return size - 1;
+}
+
+function simplify_points(points) {
+  const result = [];
+
+  let size = points.length;
+
+  for (let i = size - 1; i >= 0; i -= 1) {
+    const p1 = points[i];
+    size -= 1;
+
+    for (let j = size - 1; j >= 0; j -= 1) {
+      if (i !== j) {
+        const p2 = points[j];
+
+        if (pt_dist2(p1, p2) < 144) {
+          size = swap_remove(points, size, j);
+          i -= 1;
+        }
+      }
+    }
+
+    result.push(p1);
+  }
+
+  return result;
+}
+
 function loadP5Image({ width, height, pixels }) {
   ctx.img = createImage(width, height);
   
@@ -293,6 +333,9 @@ function loadP5Image({ width, height, pixels }) {
   // ctx.points = lines.flat();
 
   ctx.points = hough_points_of_interest(hough);
+  console.log('points count', ctx.points.length);
+  ctx.points = simplify_points(ctx.points);
+  console.log('points count', ctx.points.length);
 
   ctx.width = img2.width;
   ctx.height = img2.height;
