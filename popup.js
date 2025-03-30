@@ -188,6 +188,7 @@ function draw() {
       ellipse(point.x, point.y, 10, 10);
     }
   } else {
+    strokeWeight(4);
     const len = ctx.path.length;
 
     for (let i = 0; i < len - 1; i += 1) {
