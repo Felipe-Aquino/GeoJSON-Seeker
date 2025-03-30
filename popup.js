@@ -47,6 +47,8 @@ const ui = {
   pressed_id: -1,
   last_pressed_id: -1,
 
+  loader_offset: 0,
+
   pin_icon: null,
   path_icon: null,
   broom_icon: null,
@@ -186,9 +188,9 @@ function draw() {
       ellipse(point.x, point.y, 10, 10);
     }
   } else {
-    const size = ctx.path.length;
+    const len = ctx.path.length;
 
-    for (let i = 0; i < size - 1; i += 1) {
+    for (let i = 0; i < len - 1; i += 1) {
       const p1 = ctx.path[i];
       const p2 = ctx.path[i + 1];
 
@@ -202,7 +204,7 @@ function draw() {
     msg = 'Adicione 2 pontos no mapa';
   } else if (ctx.coords.length === 1) {
     msg = 'Adicione 1 ponto no mapa';
-  } else if (!ctx.showing_img) {
+  } else if (!ctx.showing_img && !ctx.loading) {
     msg = 'Clique em Load Canvas';
   }
 
@@ -215,6 +217,10 @@ function draw() {
     text(msg, (ctx.width - w) / 2, (ctx.height - 10) / 2);
   }
 
+  if (ctx.loading) {
+    loader(ctx.width / 2, ctx.height / 2, 5, 50, 5);
+  }
+
   let x = 10 + ctx.scroll_offset.x;
   let y = 10 + ctx.scroll_offset.y;
 
@@ -225,7 +231,7 @@ function draw() {
     }
   }
 
-  if (ctx.canvas_loaded) {
+  if (ctx.canvas_loaded && !ctx.loading) {
     if (icon_button(ui.pin_icon, 'Marcar pontos', x, y, ctx.marking_points)) {
       ctx.path = [];
       ctx.marking_points = !ctx.marking_points;
@@ -478,6 +484,31 @@ function points_table(points, x, y) {
   }
 }
 
+function loader(x, y, gap, r1, r2) {
+  const speed = 20;
+    
+  const k = r2 / (2 * r1);
+  const theta = Math.atan(2 * k * Math.sqrt(1 - k * k) / (1 - 2 * k * k));
+  const n = Math.floor(2 * Math.PI * r1 / (theta * r1 + gap));
+  
+  for (let i = 0; i < n; i += 1) {
+    const ang = 2 * Math.PI * i / n;
+    const x1 = x + r1 * Math.cos(ang) + r1 * Math.sin(ang);
+    const y1 = y + r1 * Math.cos(ang) - r1 * Math.sin(ang);
+
+    const alfa = 255 - ((Math.floor(ui.loader_offset + i) % n) * 255 / n);
+    fill(0, 0, 0, alfa);
+    stroke(0, 0, 0, alfa)
+
+    circle(x1, y1, r2);
+  }
+  
+  ui.loader_offset += speed * deltaTime / 1000;
+  if (ui.loader_offset >= n) {
+    ui.loader_offset = 0;
+  }
+}
+
 function isAround(x, value, p) {
   return (((1 - p) * value <= x) && (x <= (1 + p) * value));
 }
@@ -498,29 +529,29 @@ function pt_dist2(p1, p2) {
     return dx * dx + dy * dy;
 }
 
-function swap_remove(arr, size, at) {
+function swap_remove(arr, len, at) {
   const aux = arr[at];
-  arr[at] = arr[size - 1];
-  arr[size - 1] = aux;
+  arr[at] = arr[len - 1];
+  arr[len - 1] = aux;
 
-  return size - 1;
+  return len - 1;
 }
 
 function simplify_points(points) {
   const result = [];
 
-  let size = points.length;
+  let len = points.length;
 
-  for (let i = size - 1; i >= 0; i -= 1) {
+  for (let i = len - 1; i >= 0; i -= 1) {
     const p1 = points[i];
-    size -= 1;
+    len -= 1;
 
-    for (let j = size - 1; j >= 0; j -= 1) {
+    for (let j = len - 1; j >= 0; j -= 1) {
       if (i !== j) {
         const p2 = points[j];
 
         if (pt_dist2(p1, p2) < 144) {
-          size = swap_remove(points, size, j);
+          len = swap_remove(points, len, j);
           i -= 1;
         }
       }
@@ -647,20 +678,20 @@ function loadP5Image({ width, height, pixels }) {
 function connect_points(points) {
   const path = [];
   const points2 = points.slice();
-  let size = points.length;
+  let len = points.length;
 
-  const idx = Math.floor(size * Math.random());
+  const idx = Math.floor(len * Math.random());
 
   let p1 = points2[idx];
   path.push(p1);
 
-  size = swap_remove(points2, size, idx);
+  len = swap_remove(points2, len, idx);
 
-  while (size > 0) {
+  while (len > 0) {
     let min_dist = Infinity;
     let min_dist_idx = -1;
 
-    for (let j = size - 1; j >= 0; j -= 1) {
+    for (let j = len - 1; j >= 0; j -= 1) {
       const p2 = points2[j];
 
       if (min_dist > pt_dist2(p1, p2)) {
@@ -670,7 +701,7 @@ function connect_points(points) {
     }
 
     p1 = points2[min_dist_idx];
-    size = swap_remove(points2, size, min_dist_idx);
+    len = swap_remove(points2, len, min_dist_idx);
 
     path.push(p1);
   }
