@@ -1,10 +1,60 @@
 const ctx = {
-  width: 1,
-  height: 1,
+  width: 800 * 0.95,
+  height: 600 * 0.90,
   img: null,
   showing_img: null,
   offset: null,
   points: [],
+
+  loading: false,
+  coords: [],
+  show_points: false,
+
+  scroll_offset: { x: 0, y: 0 },
+
+  clear() {
+    this.img = null;
+    this.showing_img = null;
+    this.offset = null;
+    this.points = [];
+    this.coords = [];
+
+    this.width = 800 * 0.95;
+    this.height = 600 * 0.9;
+
+    this.scroll_offset = { x: 0, y: 0 };
+  },
+};
+
+const ui = {
+  hot_id: -1,
+  last_hot_id: -1,
+  pressed_id: -1,
+  last_pressed_id: -1,
+
+  reset() {
+    this.last_hot_id = this.hot_id;
+    this.hot_id = -1;
+
+    this.last_pressed_id = this.pressed_id;
+    this.pressed_id = -1;
+  },
+  cyrb53(str, seed = 0) {
+    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+
+    for(let i = 0, ch; i < str.length; i++) {
+      ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+
+    h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  }
 };
 
 // Function to retrieve state
@@ -25,22 +75,6 @@ function setState(key, value) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-  const load_canvas_btn = document.getElementById("load-canvas");
-
-  load_canvas_btn.addEventListener("click", async () => {
-    // setState('coords', '');
-    getCanvas();
-  });
-
-  const start_clicks_btn = document.getElementById("start-clicks");
-
-  start_clicks_btn.addEventListener("click", async () => {
-    setState('coords', '');
-    listenClicks();
-  });
-
-  const message = document.getElementById("message");
-
   let coords = await getState('coords');
 
   if (coords) {
@@ -49,86 +83,29 @@ document.addEventListener('DOMContentLoaded', async function () {
     coords = [];
   }
 
-  if (coords.length === 0) {
-    load_canvas_btn.style.display = 'none';
-    message.innerHTML = '<div>Adicione 2 pontos no mapa</div>';
-  } else if (coords.length === 1) {
-    load_canvas_btn.style.display = 'none';
-    const c = coords[0];
+  ctx.coords = coords;
 
-    const table = `
-      <table class="table">
-        <tr>
-          <th></th>
-          <th>Ponto 1</th>
-          <th>Ponto 2</th>
-        </tr>
-        <tr>
-          <td>x:</td>
-          <td>${c.x}</td>
-        </tr>
-        <tr>
-          <td>y:</td>
-          <td>${c.y}</td>
-        </tr>
-        <tr>
-          <td>lat:</td>
-          <td>${c.lat}</td>
-        </tr>
-        <tr>
-          <td>lng:</td>
-          <td>${c.lng}</td>
-        </tr>
-      </table>
-    `;
-
-    message.innerHTML = `${table}<div>Ainda falta 1 ponto</div>`;
-  } else {
-    start_clicks_btn.style.display = 'none';
-    const c1 = coords[0];
-    const c2 = coords[1];
-
-    const table = `
-      <table class="table">
-        <tr>
-          <th></th>
-          <th>Ponto 1</th>
-          <th>Ponto 2</th>
-        </tr>
-        <tr>
-          <td>x:</td>
-          <td>${c1.x}</td>
-          <td>${c2.x}</td>
-        </tr>
-        <tr>
-          <td>y:</td>
-          <td>${c1.y}</td>
-          <td>${c2.y}</td>
-        </tr>
-        <tr>
-          <td>lat:</td>
-          <td>${c1.lat}</td>
-          <td>${c2.lat}</td>
-        </tr>
-        <tr>
-          <td>lng:</td>
-          <td>${c1.lng}</td>
-          <td>${c2.lng}</td>
-        </tr>
-      </table>
-    `;
-
-    message.innerHTML = `${table}`;
+  if (ctx.coords.length === 0) {
+    listenClicks();
   }
+
+  const p5_main = document.getElementById('p5-main');
+  p5_main.addEventListener('scroll', () => {
+    ctx.scroll_offset.x = p5_main.scrollLeft;
+    ctx.scroll_offset.y = p5_main.scrollTop;
+  });
 });
 
 function getCanvas() {
+  ctx.loading = true;
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, { action: 'get-canvas' }, (response) => {
       console.log('content\'s response', response);
       if (response.pixels) {
         console.log('len', response.pixels.length);
         loadP5Image(response);
+        ctx.loading = false;
       }
     });
   });
@@ -147,10 +124,13 @@ function setup() {
 }
 
 function draw() {
+  textAlign(LEFT, TOP);
+
   if (ctx.showing_img) {
     image(ctx.showing_img, 0, 0);
   } else {
-    background(220);
+    // background(110);
+    background(230);
   }
 
   noFill();
@@ -160,6 +140,166 @@ function draw() {
 
   for (const point of ctx.points) {
     ellipse(point.x, point.y, 10, 10);
+  }
+
+  let msg = '';
+
+  if (ctx.coords.length === 0) {
+    msg = 'Adicione 2 pontos no mapa';
+  } else if (ctx.coords.length === 1) {
+    msg = 'Adicione 1 ponto no mapa';
+  } else if (!ctx.coords.showing_img) {
+    msg = 'Clique em Load Canvas';
+  }
+
+  if (msg) {
+    fill(0x00)
+    textSize(20);
+    noStroke();
+
+    const w = textWidth(msg);
+    text(msg, (ctx.width - w) / 2, (ctx.height - 10) / 2);
+  }
+
+  let x = 10 + ctx.scroll_offset.x;
+  let y = 10 + ctx.scroll_offset.y;
+
+  if (button('Load Canvas', x, y) && !ctx.loading) {
+    if (ctx.coords.length == 2) {
+      getCanvas();
+    }
+  }
+
+  y += 60;
+  if (button('Pontos/Coords', x, y)) {
+    ctx.show_points = !ctx.show_points;
+  }
+
+  if (ctx.show_points) {
+    const w = textWidth('Limpar Coords') + 20;
+    points_table(ctx.coords, x + w, y);
+  }
+
+  y += 50;
+  if (button('Limpar Coords', x, y)) {
+    setState('coords', '');
+    listenClicks();
+
+    ctx.clear();
+    resizeCanvas(ctx.width, ctx.height);
+  }
+
+  ui.reset();
+}
+
+function button(name, x, y) {
+  const id = ui.cyrb53(name, x * y);
+
+  strokeWeight(0.5);
+  textStyle(NORMAL);
+  textSize(16);
+
+  const w = textWidth(name) + 16;
+  const h = 40;
+  const r = 2;
+  
+  let pressed = false;
+  if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h) {
+    ui.hot_id = id;
+
+    if (mouseIsPressed) {
+      ui.pressed_id  = id;
+      if (id !== ui.last_pressed_id) {
+        pressed = true;
+      }
+
+      fill(0x33, 0x33, 0x33);
+    } else {
+      fill(21, 188, 163);
+    }
+  } else {
+    fill(0, 0xd1, 0xb2);
+  }
+  
+  strokeWeight(1);
+
+  rect(x, y, w, h, r);
+  
+  noFill();
+  stroke(0, 0xd1, 0xb2);
+  rect(x, y, w, h, r);
+  
+  fill(0xff);
+  noStroke();
+
+  text(name, x + 8, y + h / 2 - 7);
+  
+  return pressed;
+}
+
+function points_table(points, x, y) {
+  const letter_width = textWidth('M');
+  const pad = 6;
+  const xspacing = 3;
+  const yspacing = 13;
+  const w = letter_width * (9 * 2 + 3) + 2 * xspacing + 2 * pad;
+  const h = 16 + 4 * 14 + 4 * yspacing + 2 * pad;
+
+  fill(0xff);
+  stroke(0x00);
+  strokeWeight(0.5);
+  
+  rect(x, y, w, h);
+
+  stroke(0x99);
+  strokeWeight(0.5);
+  
+  let x0 = x;
+  let y0 = y + pad + 16 + yspacing / 2 - 2;
+  
+  for (let i = 0; i < 4; ++i) {
+    line(x0, y0, x0 + w, y0);
+    y0 += 14 + yspacing;
+  }
+  
+  fill(0x00);
+  stroke(0x00);
+  strokeWeight(0.5);
+  textStyle(NORMAL);
+  textSize(16);
+
+  x0 = x + letter_width * 3 + xspacing + pad;
+  y0 = y + pad;
+
+  text("Ponto 1", x0, y0);
+
+  x0 = x0 + letter_width * 10 + xspacing;
+  text("Ponto 2", x0, y0);
+  
+  noStroke();
+  textSize(14);
+
+  const keys = ['x', 'y', 'lat', 'lng']; 
+  x0 = x + pad;
+  y0 = y0 + 16 + yspacing;
+  for (const k of keys) {
+    text(k, x0, y0);
+    y0 += 14 + yspacing;
+  }
+  
+  x0 = x + pad + 3 * letter_width + xspacing;
+  y0 = y + pad + 16 + yspacing;
+
+  for (const p of points) {
+    y0 = y + pad + 16 + yspacing;
+
+    for (const k of keys) {
+      text(p[k], x0, y0);
+      y0 += 14 + yspacing;
+    }
+    
+    x0 += 10 * letter_width + xspacing;
+    y0 = y + pad + 16 + yspacing;
   }
 }
 

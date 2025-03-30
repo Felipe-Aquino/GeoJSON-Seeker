@@ -3,30 +3,32 @@
   <head>
     <style>
       body {
-        height: 768px;
-        width: 1024px;
+        height: 600px;
+        width: 800px;
+        margin: 0px;
+        padding: 0px;
+        overflow: hidden;
+      }
+
+      .p5-main {
+        width: 95%;
+        height: 92%;
+        overflow: auto;
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: 25px;
       }
     </style>
 
-    <link rel="stylesheet" type="text/css" href="css/bulma.min.css" />
     <script src="p5.js"> </script>
     <script src="hough.js"> </script>
     <!-- script src="main.js"> </script> -->
   </head>
 
   <body>
-    <main>
-    </main>
-
-    <button id="load-canvas" class="button is-primary">
-      Load Canvas
-    </button>
-
-    <button id="start-clicks" class="button is-primary">
-      Wait Clicks
-    </button>
-
-    <div id="message"></div>
+    <div id="p5-main" class="p5-main">
+      <main></main>
+    </div>
 
     <script src="popup.js"></script>
   </body>
