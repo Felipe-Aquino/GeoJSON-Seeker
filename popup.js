@@ -50,6 +50,7 @@ const ui = {
   pin_icon: null,
   path_icon: null,
   broom_icon: null,
+  clipboard_icon: null,
 
   reset() {
     this.last_hot_id = this.hot_id;
@@ -144,11 +145,13 @@ function preload() {
   // <a href="https://www.flaticon.com/free-icons/pushpin" title="pushpin icons">Pushpin icons created by ekays.dsgn - Flaticon</a>
   // <a href="https://www.flaticon.com/free-icons/clear" title="clear icons">Clear icons created by LAFS - Flaticon</a>
   // <a href="https://www.flaticon.com/free-icons/path" title="path icons">Path icons created by prettycons - Flaticon</a>
+  // <a href="https://www.flaticon.com/free-icons/path" title="path icons">Path icons created by prettycons - Flaticon</a>
+  // <a href="https://www.flaticon.com/free-icons/clipboard" title="clipboard icons">Clipboard icons created by Freepik - Flaticon</a>
 
   ui.pin_icon = loadImage('/assets/pin2_white_32px.png');
   ui.broom_icon = loadImage('/assets/broom2_white_32px.png');
   ui.path_icon = loadImage('/assets/route_white_32px.png');
-
+  ui.clipboard_icon = loadImage('/assets/clipboard_white_32px.png');
 }
 
 function setup() {
@@ -157,6 +160,7 @@ function setup() {
   ui.pin_icon.resize(20, 0);
   ui.broom_icon.resize(20, 0);
   ui.path_icon.resize(20, 0);
+  ui.clipboard_icon.resize(20, 0);
 }
 
 function draw() {
@@ -241,6 +245,11 @@ function draw() {
       if (ok && ctx.path.length === 0) {
         ctx.path = connect_points(ctx.points);
       }
+    }
+
+    y += 50;
+    if (ctx.path.length > 0 && icon_button(ui.clipboard_icon, 'Copiar', x, y)) {
+      geojson_to_clipboard(ctx.path, ctx.coords, ctx.offset);
     }
   }
 
@@ -667,4 +676,22 @@ function connect_points(points) {
   }
 
   return path;
+}
+
+function geojson_to_clipboard(path, coords, offset) {
+  const [coord1, coord2] = coords;
+
+  const lat_per_pixel = (coord2.lat - coord1.lat) / (coord2.y - coord1.y);
+  const lng_per_pixel = (coord2.lng - coord1.lng) / (coord2.x - coord1.x);
+
+  const lnglats = path.map((pt) => [
+    lng_per_pixel * (pt.x + offset.x) + coord1.lng,
+    lat_per_pixel * (pt.y + offset.y) + coord1.lat,
+  ]);
+
+  lnglats.push(lnglats[0]);
+
+  const geojson = JSON.stringify({ type: 'Polygon', coordinates: [lnglats] });
+
+  navigator.clipboard.writeText(geojson);
 }
