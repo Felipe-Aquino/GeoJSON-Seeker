@@ -1,6 +1,9 @@
+const total_width = 800 * 0.95;
+const total_height = 600 * 0.90;
+
 const ctx = {
-  width: 800 * 0.95,
-  height: 600 * 0.90,
+  width: total_width,
+  height: total_height,
   img: null,
   showing_img: null,
   offset: null,
@@ -8,7 +11,9 @@ const ctx = {
 
   loading: false,
   coords: [],
-  show_points: false,
+  show_coords: false,
+
+  canvas_loaded: false,
 
   scroll_offset: { x: 0, y: 0 },
 
@@ -19,10 +24,12 @@ const ctx = {
     this.points = [];
     this.coords = [];
 
-    this.width = 800 * 0.95;
-    this.height = 600 * 0.9;
+    this.width = total_width;
+    this.height = total_height;
 
     this.scroll_offset = { x: 0, y: 0 };
+
+    this.canvas_loaded = false;
   },
 };
 
@@ -31,6 +38,10 @@ const ui = {
   last_hot_id: -1,
   pressed_id: -1,
   last_pressed_id: -1,
+
+  pin_icon: null,
+  path_icon: null,
+  broom_icon: null,
 
   reset() {
     this.last_hot_id = this.hot_id;
@@ -119,8 +130,25 @@ function listenClicks() {
   });
 }
 
+function preload() {
+  // TODO: add icon attribution if needed
+  // <a href="https://www.flaticon.com/free-icons/path" title="path icons">Path icons created by Bharat Icons - Flaticon</a>
+  // <a href="https://www.flaticon.com/free-icons/pushpin" title="pushpin icons">Pushpin icons created by ekays.dsgn - Flaticon</a>
+  // <a href="https://www.flaticon.com/free-icons/clear" title="clear icons">Clear icons created by LAFS - Flaticon</a>
+  // <a href="https://www.flaticon.com/free-icons/path" title="path icons">Path icons created by prettycons - Flaticon</a>
+
+  ui.pin_icon = loadImage('/assets/pin2_white_32px.png');
+  ui.broom_icon = loadImage('/assets/broom2_white_32px.png');
+  ui.path_icon = loadImage('/assets/route_white_32px.png');
+
+}
+
 function setup() {
   createCanvas(ctx.width, ctx.height);
+
+  ui.pin_icon.resize(20, 0);
+  ui.broom_icon.resize(20, 0);
+  ui.path_icon.resize(20, 0);
 }
 
 function draw() {
@@ -136,7 +164,9 @@ function draw() {
   noFill();
   strokeWeight(2);
 
-  stroke(122, 244, 158);
+  // stroke(122, 244, 158);
+  stroke(0x26, 0x35, 0xd7)
+  //stroke(0x7, 0x54, 0x1e);
 
   for (const point of ctx.points) {
     ellipse(point.x, point.y, 10, 10);
@@ -148,7 +178,7 @@ function draw() {
     msg = 'Adicione 2 pontos no mapa';
   } else if (ctx.coords.length === 1) {
     msg = 'Adicione 1 ponto no mapa';
-  } else if (!ctx.coords.showing_img) {
+  } else if (!ctx.showing_img) {
     msg = 'Clique em Load Canvas';
   }
 
@@ -164,20 +194,29 @@ function draw() {
   let x = 10 + ctx.scroll_offset.x;
   let y = 10 + ctx.scroll_offset.y;
 
-  if (button('Load Canvas', x, y) && !ctx.loading) {
-    if (ctx.coords.length == 2) {
+  if (!ctx.canvas_loaded && button('Load Canvas', x, y)) {
+    if (ctx.coords.length == 2 && !ctx.loading) {
       getCanvas();
+      ctx.canvas_loaded = true;
     }
   }
 
-  y += 60;
-  if (button('Pontos/Coords', x, y)) {
-    ctx.show_points = !ctx.show_points;
+  if (ctx.canvas_loaded) {
+    icon_button(ui.pin_icon, 'Marcar pontos', x, y);
+    y += 50;
+    icon_button(ui.broom_icon, 'Remover pontos', x, y);
+    y += 50;
+    icon_button(ui.path_icon, 'Conectar pontos', x, y);
   }
 
-  if (ctx.show_points) {
+  y = ctx.scroll_offset.y + total_height - 110;
+  if (button('Ver Coords', x, y)) {
+    ctx.show_coords = !ctx.show_coords;
+  }
+
+  if (ctx.show_coords) {
     const w = textWidth('Limpar Coords') + 20;
-    points_table(ctx.coords, x + w, y);
+    points_table(ctx.coords, x + w, y - 40);
   }
 
   y += 50;
@@ -203,14 +242,14 @@ function button(name, x, y) {
   const h = 40;
   const r = 2;
   
-  let pressed = false;
+  let clicked = false;
   if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h) {
     ui.hot_id = id;
 
     if (mouseIsPressed) {
       ui.pressed_id  = id;
       if (id !== ui.last_pressed_id) {
-        pressed = true;
+        clicked = true;
       }
 
       fill(0x33, 0x33, 0x33);
@@ -221,12 +260,11 @@ function button(name, x, y) {
     fill(0, 0xd1, 0xb2);
   }
   
-  strokeWeight(1);
+  strokeWeight(0.5);
+  // stroke(0, 0xd1, 0xb2);
+  // stroke(0x7, 0x54, 0x1e);
+  stroke(0x27, 0x74, 0x2e);
 
-  rect(x, y, w, h, r);
-  
-  noFill();
-  stroke(0, 0xd1, 0xb2);
   rect(x, y, w, h, r);
   
   fill(0xff);
@@ -234,7 +272,64 @@ function button(name, x, y) {
 
   text(name, x + 8, y + h / 2 - 7);
   
-  return pressed;
+  return clicked;
+}
+
+function icon_button(icon, name, x, y) {
+  if (!icon) {
+    return;
+  }
+
+  const id = ui.cyrb53(name, x * y);
+
+  strokeWeight(0.5);
+  textStyle(NORMAL);
+  textSize(16);
+
+  const w = icon.width + 16;
+  const h = 40;
+  const r = 2;
+  
+  let clicked = false;
+  if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h) {
+    ui.hot_id = id;
+
+    if (mouseIsPressed) {
+      ui.pressed_id  = id;
+      if (id !== ui.last_pressed_id) {
+        clicked = true;
+      }
+
+      fill(0x33, 0x33, 0x33);
+    } else {
+      fill(21, 188, 163);
+    }
+  } else {
+    fill(0, 0xd1, 0xb2);
+  }
+  
+  strokeWeight(0.5);
+  // stroke(0, 0xd1, 0xb2);
+  // stroke(0x7, 0x54, 0x1e);
+  stroke(0x27, 0x74, 0x2e);
+
+  const w2 = ui.hot_id === id
+    ? w + textWidth(name) + 6
+    : w;
+
+  rect(x, y, w2, h, r);
+  
+  image(icon, x + (w - icon.width) / 2, y + (h - icon.height) / 2);
+
+  if (ui.hot_id === id) {
+    fill(0xff);
+    noStroke();
+
+    const x2 = x + icon.width + 8 + 6;
+    text(name, x2, y + h / 2 - 7);
+  }
+  
+  return clicked;
 }
 
 function points_table(points, x, y) {
