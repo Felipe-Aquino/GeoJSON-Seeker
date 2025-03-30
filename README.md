@@ -2,7 +2,7 @@
 
 Uma extensão capaz de extrair GeoJSON a partir de contornos no Google Maps.
 
-![Demo](https://github.com/Felipe-Aquino/GeoJSON-Seeker/blob/master/demo.gif)
+https://github.com/user-attachments/assets/1225d01b-89b7-4831-bc3a-ab8b504b34fa
 
 ## Sobre 
 
