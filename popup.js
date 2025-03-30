@@ -8,10 +8,14 @@ const ctx = {
   showing_img: null,
   offset: null,
   points: [],
+  path: [],
 
   loading: false,
   coords: [],
   show_coords: false,
+
+  marking_points: false,
+  removing_points: false,
 
   canvas_loaded: false,
 
@@ -22,7 +26,11 @@ const ctx = {
     this.showing_img = null;
     this.offset = null;
     this.points = [];
+    this.path = [];
     this.coords = [];
+
+    this.marking_points = false;
+    this.removing_points = false;
 
     this.width = total_width;
     this.height = total_height;
@@ -168,8 +176,20 @@ function draw() {
   stroke(0x26, 0x35, 0xd7)
   //stroke(0x7, 0x54, 0x1e);
 
-  for (const point of ctx.points) {
-    ellipse(point.x, point.y, 10, 10);
+
+  if (ctx.path.length === 0) {
+    for (const point of ctx.points) {
+      ellipse(point.x, point.y, 10, 10);
+    }
+  } else {
+    const size = ctx.path.length;
+
+    for (let i = 0; i < size - 1; i += 1) {
+      const p1 = ctx.path[i];
+      const p2 = ctx.path[i + 1];
+
+      line(p1.x, p1.y, p2.x, p2.y);
+    }
   }
 
   let msg = '';
@@ -202,11 +222,26 @@ function draw() {
   }
 
   if (ctx.canvas_loaded) {
-    icon_button(ui.pin_icon, 'Marcar pontos', x, y);
+    if (icon_button(ui.pin_icon, 'Marcar pontos', x, y, ctx.marking_points)) {
+      ctx.path = [];
+      ctx.marking_points = !ctx.marking_points;
+      ctx.removing_points = false;
+    }
+
     y += 50;
-    icon_button(ui.broom_icon, 'Remover pontos', x, y);
+    if (icon_button(ui.broom_icon, 'Remover pontos', x, y, ctx.removing_points)) {
+      ctx.path = [];
+      ctx.marking_points = false;
+      ctx.removing_points = !ctx.removing_points;
+    }
+
     y += 50;
-    icon_button(ui.path_icon, 'Conectar pontos', x, y);
+    if (icon_button(ui.path_icon, 'Conectar pontos', x, y)) {
+      const ok = !(ctx.marking_points || ctx.removing_points);
+      if (ok && ctx.path.length === 0) {
+        ctx.path = connect_points(ctx.points);
+      }
+    }
   }
 
   y = ctx.scroll_offset.y + total_height - 110;
@@ -229,6 +264,38 @@ function draw() {
   }
 
   ui.reset();
+}
+
+function mouseClicked() {
+  if (ui.hot_id !== -1 || ui.last_hot_id !== -1) {
+    return;
+  }
+
+  if (ctx.marking_points) {
+    const pt = {
+      x: mouseX,
+      y: mouseY,
+    };
+
+    const found = ctx.points.find((p) => pt_dist2(p, pt) < 144);
+
+    if (!found) {
+      ctx.points.push(pt);
+    }
+  }
+
+  if (ctx.removing_points) {
+    const pt = {
+      x: mouseX,
+      y: mouseY,
+    };
+
+    const idx = ctx.points.findIndex((p) => pt_dist2(p, pt) < 144);
+
+    if (idx >= 0) {
+      ctx.points.splice(idx, 1);
+    }
+  }
 }
 
 function button(name, x, y) {
@@ -275,7 +342,7 @@ function button(name, x, y) {
   return clicked;
 }
 
-function icon_button(icon, name, x, y) {
+function icon_button(icon, name, x, y, toggle) {
   if (!icon) {
     return;
   }
@@ -307,13 +374,17 @@ function icon_button(icon, name, x, y) {
   } else {
     fill(0, 0xd1, 0xb2);
   }
+
+  if (toggle) {
+    fill(0x33, 0x33, 0x33);
+  }
   
   strokeWeight(0.5);
   // stroke(0, 0xd1, 0xb2);
   // stroke(0x7, 0x54, 0x1e);
   stroke(0x27, 0x74, 0x2e);
 
-  const w2 = ui.hot_id === id
+  const w2 = ui.hot_id === id || toggle
     ? w + textWidth(name) + 6
     : w;
 
@@ -321,7 +392,7 @@ function icon_button(icon, name, x, y) {
   
   image(icon, x + (w - icon.width) / 2, y + (h - icon.height) / 2);
 
-  if (ui.hot_id === id) {
+  if (ui.hot_id === id || toggle) {
     fill(0xff);
     noStroke();
 
@@ -405,9 +476,9 @@ function isAround(x, value, p) {
 function testColor(r, g, b) {
   const v = 0.1;
 
-    // ea4335
-    // e27a69
-    // e37867
+  // ea4335
+  // e27a69
+  // e37867
   return isAround(r, 0xea, v) && isAround(g, 0x43, v) && isAround(b, 0x35, v);
   // return isAround(r, 0xf2, v) && isAround(g, 0x78, v) && isAround(b, 0x6b, v);
 }
@@ -530,30 +601,18 @@ function loadP5Image({ width, height, pixels }) {
 
   // Black and white pixels used by hough algorithm
   const bw_pixels = new Array(numPixels);
-  // let img3 = createImage(img2.width, img2.height);
-  // img3.loadPixels();
 
   for (let i = 0; i < numPixels; i += 4) {
     bw_pixels[i + 3] = 255;
-    // img3.pixels[i + 3] = 255;
 
     if (testColor(img2.pixels[i], img2.pixels[i + 1], img2.pixels[i + 2])) {
       bw_pixels[i] = 0;
       bw_pixels[i + 1] = 0;
       bw_pixels[i + 2] = 0;
-
-      // img3.pixels[i] = 0;
-      // img3.pixels[i + 1] = 0;
-      // img3.pixels[i + 2] = 0;
-
     } else {
       bw_pixels[i] = 0xff;
       bw_pixels[i + 1] = 0xff;
       bw_pixels[i + 2] = 0xff;
-
-      // img3.pixels[i] = 0xff;
-      // img3.pixels[i + 1] = 0xff;
-      // img3.pixels[i + 2] = 0xff;
     }
   }
 
@@ -562,10 +621,6 @@ function loadP5Image({ width, height, pixels }) {
   const hough = hough_create(bw_pixels, img2.width, img2.height);
 
   hough_proccess(hough);
-
-  // const lines = hough_lines_of_interest0(hough);
-
-  // ctx.points = lines.flat();
 
   ctx.points = hough_points_of_interest(hough);
   console.log('points count', ctx.points.length);
@@ -576,7 +631,40 @@ function loadP5Image({ width, height, pixels }) {
   ctx.height = img2.height;
 
   ctx.showing_img = img2;
-  // ctx.showing_img = img3;
 
   resizeCanvas(ctx.width, ctx.height);
+}
+
+function connect_points(points) {
+  const path = [];
+  const points2 = points.slice();
+  let size = points.length;
+
+  const idx = Math.floor(size * Math.random());
+
+  let p1 = points2[idx];
+  path.push(p1);
+
+  size = swap_remove(points2, size, idx);
+
+  while (size > 0) {
+    let min_dist = Infinity;
+    let min_dist_idx = -1;
+
+    for (let j = size - 1; j >= 0; j -= 1) {
+      const p2 = points2[j];
+
+      if (min_dist > pt_dist2(p1, p2)) {
+        min_dist = pt_dist2(p1, p2);
+        min_dist_idx = j;
+      }
+    }
+
+    p1 = points2[min_dist_idx];
+    size = swap_remove(points2, size, min_dist_idx);
+
+    path.push(p1);
+  }
+
+  return path;
 }
