@@ -63,13 +63,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         coordButton && coordButton.innerHTML
       );
 
+      // const ctx = canvas.getContext('2d');
+      // const ball = new Path2D();
+      // const x = event.layerX * (canvas.width / canvas.clientWidth);
+      // const y = event.layerY * (canvas.height / canvas.clientHeight);
+      // ball.arc(x, y, 50, 0, 2 * Math.PI);
+      // ctx.fillStyle = '#aa000055';
+      // ctx.fill(ball);
+
       if (coordButton && coordButton.innerText) {
+        // layerX and layerY are non-standard but it's the only way to get an accurate position
+        const x = event.layerX * (canvas.width / canvas.clientWidth);
+        const y = event.layerY * (canvas.height / canvas.clientHeight);
+
         const values = coordButton.innerText.split(', ').map((v) => parseFloat(v));
         const state = {
           lat: values[0],
           lng: values[1],
-          x: event.clientX,
-          y: event.clientY,
+          x,
+          y,
         };
 
         getState('coords', (coords) => {
@@ -88,14 +100,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         });
       }
-
-      // Send a message to the background script
-      chrome.runtime.sendMessage({
-        action: "clicked-outside",
-        target: event.target.tagName,
-        x: event.clientX,
-        y: event.clientY,
-      });
     });
   }
 

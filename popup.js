@@ -251,6 +251,8 @@ function draw() {
       const ok = !(ctx.marking_points || ctx.removing_points);
       if (ok && ctx.path.length === 0) {
         ctx.path = connect_points(ctx.points);
+      } else if (ctx.path.length > 0) {
+        ctx.path = [];
       }
     }
 
@@ -713,12 +715,12 @@ function connect_points(points) {
 function geojson_to_clipboard(path, coords, offset) {
   const [coord1, coord2] = coords;
 
-  const lat_per_pixel = (coord2.lat - coord1.lat) / (coord2.y - coord1.y);
   const lng_per_pixel = (coord2.lng - coord1.lng) / (coord2.x - coord1.x);
+  const lat_per_pixel = (coord2.lat - coord1.lat) / (coord2.y - coord1.y);
 
   const lnglats = path.map((pt) => [
-    lng_per_pixel * (pt.x + offset.x) + coord1.lng,
-    lat_per_pixel * (pt.y + offset.y) + coord1.lat,
+    lng_per_pixel * (pt.x + offset.x - coord1.x) + coord1.lng,
+    lat_per_pixel * (pt.y + offset.y - coord1.y) + coord1.lat - 0.000085,
   ]);
 
   lnglats.push(lnglats[0]);
