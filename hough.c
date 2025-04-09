@@ -87,14 +87,18 @@ typedef struct Point {
 } Point;
 
 typedef struct Points {
-    int size;
     int capacity;
+    int size;
     Point *data;
 } Points;
 
-typedef struct Vec2 {
+typedef struct Vec2f {
     float x, y;
-} Vec2;
+} Vec2f;
+
+typedef struct Vec2i {
+    int x, y;
+} Vec2i;
 
 typedef struct Color {
     uchar r, g, b;
@@ -107,6 +111,16 @@ typedef struct BucketInfo {
 typedef struct Bounds {
     int min_x, min_y, max_x, max_y;
 } Bounds;
+
+typedef struct Result {
+    int num_pixels;
+    uchar *pixels;
+    int width;
+    int height;
+
+    Vec2i offset;
+    Points points;
+} Result;
 
 int point_dist2(Point p1, Point p2) {
     int dx = p2.x - p1.x;
@@ -195,7 +209,7 @@ Bounds get_area_bounds(uchar *pixels, int width, int height) {
 #define RADIUS_STEP 4
 #define ANGLES_DIVISION_COUNT 50
 
-Points *points_of_interest(uchar *pixels, int width, int height) {
+Result *points_of_interest(uchar *pixels, int width, int height) {
     Bounds bounds = get_area_bounds(pixels, width, height);
     printf("min_x: %d, min_y: %d, max_x: %d, max_y: %d\n", bounds.min_x, bounds.min_y, bounds.max_y, bounds.max_y);
 
@@ -209,10 +223,12 @@ Points *points_of_interest(uchar *pixels, int width, int height) {
     const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width);
     const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height);
 
-    int offset_x = MAX(bounds.min_x - pad, 0);
-    int offset_y = MAX(bounds.min_y - pad, 0);
+    Vec2i offset = {
+        .x = MAX(bounds.min_x - pad, 0),
+        .y = MAX(bounds.min_y - pad, 0),
+    };
 
-    crop_image_in_place(pixels, width, height, offset_x, offset_y, dw, dh);
+    crop_image_in_place(pixels, width, height, offset.x, offset.y, dw, dh);
 
     width = dw;
     height = dh;
@@ -226,11 +242,11 @@ Points *points_of_interest(uchar *pixels, int width, int height) {
     int *buckets = alloc(sizeof(int) * buckets_size);
 
     const float angles_step = PI / (float)ANGLES_DIVISION_COUNT;
-    Vec2 angles[ANGLES_DIVISION_COUNT];
+    Vec2f angles[ANGLES_DIVISION_COUNT];
 
     float theta = 0.0f;
     for (int i = 0; i < ANGLES_DIVISION_COUNT; ++i) {
-        angles[i] = (Vec2){ cosf(theta), sinf(theta) };
+        angles[i] = (Vec2f){ cosf(theta), sinf(theta) };
         theta += angles_step;
     }
 
@@ -318,8 +334,17 @@ Points *points_of_interest(uchar *pixels, int width, int height) {
     free(top_buckets);
 #endif
 
-    Points *result = alloc(sizeof(Points));
-    *result = points;
+    Result *result = alloc(sizeof(Result));
+
+    *result = (Result) {
+        .num_pixels = num_pixels,
+        .pixels = pixels,
+        .width = width,
+        .height = height,
+        .offset = offset,
+
+        .points = points,
+    };
 
     return result;
 }

@@ -8,6 +8,7 @@ const SchemaTypes = {
   str_ptr: 5,
   array: 6,
   array_ptr: 7,
+  u8_array_ptr: 8,
 };
 
 function value_decoder(buffer, schema, offset0 = 0) {
@@ -88,6 +89,15 @@ function value_decoder(buffer, schema, offset0 = 0) {
       value = items;
       break;
     }
+    case SchemaTypes.u8_array_ptr: {
+      value = view.getInt32(offset, true);
+      offset += 4;
+      const ptr = view.getInt32(offset, true);
+      offset += 4;
+
+      value = new Uint8Array(buffer, ptr, value);
+      break;
+    }
     default:
       console.log(schema);
       throw new Error('Invalid schema type');
@@ -127,7 +137,7 @@ async function init() {
     }
   );
 
-  console.log(wasm.instance.exports);
+  // console.log(wasm.instance.exports);
   const { free_all, alloc, points_of_interest, memory } = wasm.instance.exports;
 
   function console_log(ptr, len) {
@@ -168,26 +178,47 @@ async function init() {
 
   pixels.set(pixels_js);
 
-  const r = points_of_interest(pixels_ptr, width, height);
+  const result_ptr = points_of_interest(pixels_ptr, width, height);
 
-  const pts_dyn_arr = new Int32Array(memory.buffer, r, 3);
-  const pts = {
-    size: pts_dyn_arr[0],
-    capacity: pts_dyn_arr[1],
-    data: pts_dyn_arr[2],
-  };
+  const schema = [
+    { name: 'pixels', type: SchemaTypes.u8_array_ptr },
+    { name: 'width', type: SchemaTypes.i32 },
+    { name: 'height', type: SchemaTypes.i32 },
+    { name: 'offset_x', type: SchemaTypes.i32 },
+    { name: 'offset_y', type: SchemaTypes.i32 },
+    { name: '_', type: SchemaTypes.i32 },
+    {
+      name: 'points',
+      type: SchemaTypes.array_ptr,
+      schema: [
+        { name: 'x', type: SchemaTypes.f32 },
+        { name: 'y', type: SchemaTypes.f32 },
+        { name: 'tag', type: SchemaTypes.f32 },
+      ],
+    },
+  ];
 
-  console.log(r, pts_dyn_arr);
+  const [result] = obj_decoder(memory.buffer, schema, result_ptr);
+  console.log(result);
 
-  const values = new Float32Array(
-    memory.buffer,
-    pts.data,
-    pts.size * 3
-  );
+  // const pts_dyn_arr = new Int32Array(memory.buffer, r, 3);
+  // const pts = {
+  //   size: pts_dyn_arr[0],
+  //   capacity: pts_dyn_arr[1],
+  //   data: pts_dyn_arr[2],
+  // };
 
-  for (let i = 0; i < values.length; i += 3) {
-    console.log(i, values[i], values[i + 1], values[i + 2]);
-  }
+  // console.log(r, pts_dyn_arr);
+
+  // const values = new Float32Array(
+  //   memory.buffer,
+  //   pts.data,
+  //   pts.size * 3
+  // );
+
+  // for (let i = 0; i < values.length; i += 3) {
+  //   console.log(i, values[i], values[i + 1], values[i + 2]);
+  // }
 }
 
 init();

@@ -36,29 +36,26 @@ int main() {
     }
     printf("\n");
 
-    Points *pts = points_of_interest(pixels, width, height);
+    Result *r = points_of_interest(pixels, width, height);
 
-    width -= 2;
-    height -= 2;
-
-    for (int i = 0; i < width; ++i) {
-        for (int j = 0; j < height; ++j) {
+    for (int i = 0; i < r->width; ++i) {
+        for (int j = 0; j < r->height; ++j) {
             int p = 4 * (j * width + i);
-            printf("%02x ", (int)pixels[p]);
+            printf("%02x ", (int)r->pixels[p]);
         }
         printf("\n");
     }
     printf("\n");
 
-    printf("size: %d, cap: %d\n", pts->size, pts->capacity);
-    for (int i = 0; i < pts->size; ++i) {
-        Point pt = pts->data[i];
+    printf("size: %d, cap: %d\n", r->points.size, r->points.capacity);
+    for (int i = 0; i < r->points.size; ++i) {
+        Point pt = r->points.data[i];
 
         printf("(%f, %f): %.2f!\n", pt.x, pt.y, pt.tag);
     }
 
-    free(pts->data);
-    free(pts);
+    free(r->points.data);
+    free(r);
 
     return 0;
 }
