@@ -262,8 +262,10 @@ function draw() {
     }
   }
 
+  const editing = ctx.marking_points || ctx.removing_points;
+
   y = ctx.scroll_offset.y + total_height - 110;
-  if (button('Ver Coords', x, y)) {
+  if (!editing && button('Ver Coords', x, y)) {
     ctx.show_coords = !ctx.show_coords;
   }
 
@@ -273,7 +275,7 @@ function draw() {
   }
 
   y += 50;
-  if (button('Limpar Coords', x, y)) {
+  if (!editing &&  button('Limpar Coords', x, y)) {
     setState('coords', '');
     listenClicks();
 
@@ -566,7 +568,17 @@ function simplify_points(points) {
   return result;
 }
 
+let tick_time = Date.now();
+function tick(msg) {
+  if (msg) {
+    console.log('%s: %f s', msg, (Date.now() - tick_time) / 1000);
+  }
+
+  tick_time = Date.now();
+}
+
 function loadP5Image({ width, height, pixels }) {
+  tick();
   ctx.img = createImage(width, height);
   
   ctx.img.loadPixels();
@@ -576,6 +588,7 @@ function loadP5Image({ width, height, pixels }) {
   }
 
   ctx.img.updatePixels();
+  tick('copying');
 
   const bounds = {
     min_x: width,
@@ -612,6 +625,7 @@ function loadP5Image({ width, height, pixels }) {
 
     j += 1;
   }
+  tick('bounding');
 
   const dw = bounds.max_x - bounds.min_x;
   const dh = bounds.max_y - bounds.min_y;
@@ -639,6 +653,7 @@ function loadP5Image({ width, height, pixels }) {
   );
 
   img2.loadPixels();
+  tick('blending');
 
   numPixels = 4 * img2.width * img2.height;
 
@@ -658,17 +673,22 @@ function loadP5Image({ width, height, pixels }) {
       bw_pixels[i + 2] = 0xff;
     }
   }
+  tick('array copy');
 
   // img3.updatePixels();
 
   const hough = hough_create(bw_pixels, img2.width, img2.height);
 
   hough_proccess(hough);
+  tick('processing');
 
   ctx.points = hough_points_of_interest(hough);
   console.log('points count', ctx.points.length);
+  tick('points of interest');
+
   ctx.points = simplify_points(ctx.points);
   console.log('points count', ctx.points.length);
+  tick('simplifying');
 
   ctx.width = img2.width;
   ctx.height = img2.height;

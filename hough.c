@@ -1,0 +1,325 @@
+#ifdef NATIVE
+#include <stdio.h>
+#include <math.h>
+
+#define alloc malloc
+
+#define DA_START_CAPACITY 3000
+
+#define MIN_DIST2 2
+
+// void print_buffer() {
+//     printf("%.*s\n", buffer.size, buffer.data);
+//     buffer.size = 0;
+// }
+
+#else
+#define sqrtf __builtin_sqrtf
+
+float sinf(float);
+float cosf(float);
+
+void console_log(char *ptr, int len);
+
+extern unsigned char __heap_base;
+unsigned bump_pointer = (unsigned)(void *)&__heap_base;
+
+void *alloc(int n) {
+    n += (4 - n % 4) % 4;
+
+    unsigned r = bump_pointer;
+    bump_pointer += n;
+    return (void *)r;
+}
+
+void free_all() {
+    bump_pointer = (unsigned)(void *)&__heap_base;
+}
+
+#define DA_START_CAPACITY 3000 // 200
+
+#define MIN_DIST2 2 // 144
+
+#include "buffer.c"
+
+#define printf(fmt, ...)                        \
+    do {                                        \
+        buffer_format(fmt, __VA_ARGS__);        \
+        console_log(buffer.data, buffer.size);  \
+        buffer.size = 0;                        \
+    } while (0)
+
+#endif
+
+
+#define PI 3.1415926f
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+// Linear apend
+#define da_append(arr, value)                                            \
+    do {                                                                 \
+        if ((arr)->capacity == 0) {                                      \
+            (arr)->size = 1;                                             \
+            (arr)->capacity = DA_START_CAPACITY;                         \
+                                                                         \
+            (arr)->data = alloc((arr)->capacity * sizeof(value));        \
+        } else {                                                         \
+            (arr)->size += 1;                                            \
+                                                                         \
+            if ((arr)->size >= (arr)->capacity) {                        \
+                int new_capacity = (int) (1.5 * (float)(arr)->capacity); \
+                alloc(new_capacity - (arr)->capacity);                   \
+                (arr)->capacity = new_capacity;                          \
+            }                                                            \
+        }                                                                \
+                                                                         \
+        (arr)->data[(arr)->size - 1] = (value);                          \
+    } while (0)
+
+typedef unsigned char uchar;
+typedef unsigned int uint;
+
+typedef struct Point {
+    float x, y;
+    float tag;
+} Point;
+
+typedef struct Points {
+    int size;
+    int capacity;
+    Point *data;
+} Points;
+
+typedef struct Vec2 {
+    float x, y;
+} Vec2;
+
+typedef struct Color {
+    uchar r, g, b;
+} Color;
+
+typedef struct BucketInfo {
+    int pos, count;
+} BucketInfo;
+
+typedef struct Bounds {
+    int min_x, min_y, max_x, max_y;
+} Bounds;
+
+int point_dist2(Point p1, Point p2) {
+    int dx = p2.x - p1.x;
+    int dy = p2.y - p1.y;
+    return dx * dx + dy * dy;
+}
+
+void crop_image_in_place(uchar *pixels, int width, int height, int x, int y, int dw, int dh) {
+    dw = MIN(width, dw);
+    dh = MIN(height, dh);
+
+    int start = 0;
+
+    for (int y0 = y; y0 < y + dh; y0 += 1) {
+        for (int x0 = x; x0 < x + dw; x0 += 1) {
+            int pos = 4 * (y0 * width + x0);
+
+            pixels[start + 0] = pixels[pos + 0];
+            pixels[start + 1] = pixels[pos + 1];
+            pixels[start + 2] = pixels[pos + 2];
+            pixels[start + 3] = pixels[pos + 3];
+
+            start += 4;
+        }
+    }
+}
+
+#define IS_AROUND(x, value, p) \
+    (((1 - p) * (float)(value) <= (float)(x)) && ((float)(x) <= (1 + p) * (float)(value)))
+
+int test_color(Color *c) {
+    const float v = 0.1;
+
+    // f2786b
+    // ea4335
+    // e27a69
+    // e37867
+    const Color ref = 
+#ifndef TEST
+    { 0xea, 0x43, 0x35 };
+#else
+    { 0x00, 0x00, 0x00 };
+#endif
+
+    return IS_AROUND(c->r, ref.r, v) && IS_AROUND(c->g, ref.g, v) && IS_AROUND(c->b, ref.b, v);
+}
+
+#undef IS_AROUND
+
+Bounds get_area_bounds(uchar *pixels, int width, int height) {
+  Bounds bounds = {
+    .min_x = width,
+    .min_y = height,
+    .max_x = 0,
+    .max_y = 0
+  };
+
+  uint numPixels = 4 * width * height;
+
+  for (uint i = 0, j = 0; i < numPixels; i += 4, j += 1) {
+    if (test_color((Color *)(pixels + i))) {
+      const int x = j % width;
+      const int y = j / width;
+
+      if (x < bounds.min_x) {
+        bounds.min_x = x;
+      }
+
+      if (x > bounds.max_x) {
+        bounds.max_x = x;
+      }
+
+      if (y < bounds.min_y) {
+        bounds.min_y = y;
+      }
+
+      if (y > bounds.max_y) {
+        bounds.max_y = y;
+      }
+    }
+  }
+
+  return bounds;
+}
+
+#define RADIUS_STEP 4
+#define ANGLES_DIVISION_COUNT 50
+
+Points *points_of_interest(uchar *pixels, int width, int height) {
+    Bounds bounds = get_area_bounds(pixels, width, height);
+    printf("min_x: %d, min_y: %d, max_x: %d, max_y: %d\n", bounds.min_x, bounds.min_y, bounds.max_y, bounds.max_y);
+
+    const int pad =
+#ifndef TEST 
+        40;
+#else
+         0;
+#endif
+
+    const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width);
+    const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height);
+
+    int offset_x = MAX(bounds.min_x - pad, 0);
+    int offset_y = MAX(bounds.min_y - pad, 0);
+
+    crop_image_in_place(pixels, width, height, offset_x, offset_y, dw, dh);
+
+    width = dw;
+    height = dh;
+
+    const int diagonal_length =
+        sqrtf(width * width + height * height);
+
+    const int radius_division_count = 1 + diagonal_length / RADIUS_STEP;
+
+    int buckets_size = (ANGLES_DIVISION_COUNT + 1) * (radius_division_count + 1);
+    int *buckets = alloc(sizeof(int) * buckets_size);
+
+    const float angles_step = PI / (float)ANGLES_DIVISION_COUNT;
+    Vec2 angles[ANGLES_DIVISION_COUNT];
+
+    float theta = 0.0f;
+    for (int i = 0; i < ANGLES_DIVISION_COUNT; ++i) {
+        angles[i] = (Vec2){ cosf(theta), sinf(theta) };
+        theta += angles_step;
+    }
+
+    Points points = {0, 0, 0};
+
+    const int num_pixels = 4 * width * height;
+
+    for (int i = 0, j = 0; i < num_pixels; i += 4, j += 1) {
+        if (test_color((Color *)(pixels + i))) {
+            int row = j / width;
+            int col = j % width;
+
+            for (int ang_idx = 0; ang_idx < ANGLES_DIVISION_COUNT; ang_idx += 1) {
+                float r = col * angles[ang_idx].x + row * angles[ang_idx].y;
+
+                if (r > 0) {
+                    int rad_idx = r / RADIUS_STEP;
+                    int pos = ang_idx + rad_idx * ANGLES_DIVISION_COUNT;
+
+                    buckets[pos] += 1;
+
+                    Point p = { (float)row, (float)col, (float)pos };
+                    da_append(&points, p);
+                }
+            }
+        }
+    }
+
+    float percentile = 0.9;
+    int top_buckets_size = (int)((float)buckets_size * (1 - percentile));
+    BucketInfo *top_buckets = alloc(sizeof(BucketInfo) * top_buckets_size);
+
+    for (int i = 0; i < top_buckets_size; ++i) {
+        top_buckets[i] = (BucketInfo) { -1, 0 };
+    }
+
+    for (int i = 0; i < buckets_size; ++i) {
+        int count = buckets[i];
+        
+        for (int j = 0; j < top_buckets_size; ++j) {
+            if (count > top_buckets[j].count) {
+                for (int k = top_buckets_size - 1; k > j; --k) {
+                    top_buckets[k] = top_buckets[k - 1];
+                }
+
+                top_buckets[j] = (BucketInfo) { i, count };
+
+                break;
+            }
+        }
+    }
+
+    // Sieving points
+
+    int k = 0;
+
+    for (int i = 0; i < points.size; ++i) {
+        Point p = points.data[i];
+
+        for (int j = 0; j < top_buckets_size; ++j) {
+            if (p.tag == (float)top_buckets[j].pos) {
+                int collision = 0;
+
+                for (int l = 0; l < k; ++l) {
+                    if (point_dist2(p, points.data[l]) < MIN_DIST2) {
+                        collision = 1;
+                        break;
+                    }
+                }
+
+                if (collision == 0) {
+                    points.data[i] = points.data[k];
+                    points.data[k] = p;
+                    k += 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    points.size = k;
+
+#ifdef NATIVE
+    free(buckets);
+    free(top_buckets);
+#endif
+
+    Points *result = alloc(sizeof(Points));
+    *result = points;
+
+    return result;
+}
