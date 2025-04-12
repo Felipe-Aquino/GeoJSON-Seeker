@@ -8,10 +8,6 @@
 
 #define MIN_DIST2 2
 
-// void print_buffer() {
-//     printf("%.*s\n", buffer.size, buffer.data);
-//     buffer.size = 0;
-// }
 
 #else
 #define sqrtf __builtin_sqrtf
@@ -105,7 +101,7 @@ typedef struct Vec2i {
 } Vec2i;
 
 typedef struct Color {
-    uchar r, g, b;
+    uchar r, g, b, a;
 } Color;
 
 typedef struct BucketInfo {
@@ -117,7 +113,7 @@ typedef struct Bounds {
 } Bounds;
 
 typedef struct Result {
-    int num_pixels;
+    int pixels_size;
     uchar *pixels;
     int width;
     int height;
@@ -154,59 +150,56 @@ void crop_image_in_place(uchar *pixels, int width, int height, int x, int y, int
 #define IS_AROUND(x, value, p) \
     (((1 - p) * (float)(value) <= (float)(x)) && ((float)(x) <= (1 + p) * (float)(value)))
 
-int test_color(Color *c) {
+int test_color(Color c) {
     const float v = 0.1;
 
-    // f2786b
-    // ea4335
-    // e27a69
-    // e37867
-    const Color ref = 
+    const Color ref =
 #ifndef TEST
-    { 0xea, 0x43, 0x35 };
+    { 0xea, 0x43, 0x35, 0xff };
 #else
-    { 0x00, 0x00, 0x00 };
+    { 0x00, 0x00, 0x00, 0xff };
 #endif
 
-    return IS_AROUND(c->r, ref.r, v) && IS_AROUND(c->g, ref.g, v) && IS_AROUND(c->b, ref.b, v);
+    return IS_AROUND(c.r, ref.r, v) && IS_AROUND(c.g, ref.g, v) && IS_AROUND(c.b, ref.b, v);
 }
 
 #undef IS_AROUND
 
 Bounds get_area_bounds(uchar *pixels, int width, int height) {
-  Bounds bounds = {
-    .min_x = width,
-    .min_y = height,
-    .max_x = 0,
-    .max_y = 0
-  };
+    Bounds bounds = {
+        .min_x = width,
+        .min_y = height,
+        .max_x = 0,
+        .max_y = 0
+    };
 
-  uint numPixels = 4 * width * height;
+    uint num_pixels = width * height;
+    Color *color_pixels = (Color *) pixels;
 
-  for (uint i = 0, j = 0; i < numPixels; i += 4, j += 1) {
-    if (test_color((Color *)(pixels + i))) {
-      const int x = j % width;
-      const int y = j / width;
+    for (uint i = 0; i < num_pixels; ++i) {
+        if (test_color(color_pixels[i])) {
+            const int x = i % width;
+            const int y = i / width;
 
-      if (x < bounds.min_x) {
-        bounds.min_x = x;
-      }
+            if (x < bounds.min_x) {
+                bounds.min_x = x;
+            }
 
-      if (x > bounds.max_x) {
-        bounds.max_x = x;
-      }
+            if (x > bounds.max_x) {
+                bounds.max_x = x;
+            }
 
-      if (y < bounds.min_y) {
-        bounds.min_y = y;
-      }
+            if (y < bounds.min_y) {
+                bounds.min_y = y;
+            }
 
-      if (y > bounds.max_y) {
-        bounds.max_y = y;
-      }
+            if (y > bounds.max_y) {
+                bounds.max_y = y;
+            }
+        }
     }
-  }
 
-  return bounds;
+    return bounds;
 }
 
 #define RADIUS_STEP 4
@@ -214,7 +207,6 @@ Bounds get_area_bounds(uchar *pixels, int width, int height) {
 
 Result *points_of_interest(uchar *pixels, int width, int height) {
     Bounds bounds = get_area_bounds(pixels, width, height);
-    printf("min_x: %d, min_y: %d, max_x: %d, max_y: %d\n", bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
 
     const int pad =
 #ifndef TEST 
@@ -255,12 +247,13 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
 
     Points points = {0, 0, 0};
 
-    const int num_pixels = 4 * width * height;
+    const int num_pixels = width * height;
+    Color *color_pixels = (Color *) pixels;
 
-    for (int i = 0, j = 0; i < num_pixels; i += 4, j += 1) {
-        if (test_color((Color *)(pixels + i))) {
-            int row = j / width;
-            int col = j % width;
+    for (int i = 0; i < num_pixels; ++i) {
+        if (test_color(color_pixels[i])) {
+            int row = i / width;
+            int col = i % width;
 
             for (int ang_idx = 0; ang_idx < ANGLES_DIVISION_COUNT; ang_idx += 1) {
                 float r = col * angles[ang_idx].x + row * angles[ang_idx].y;
@@ -313,7 +306,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
             if (p.tag == top_buckets[j].pos) {
                 int collision = 0;
 
-                for (int l = 0; l < k; ++l) {
+                for (int l = k - 1; l >= 0; --l) {
                     if (point_dist2(p, points.data[l]) < MIN_DIST2) {
                         collision = 1;
                         break;
@@ -340,7 +333,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
     Result *result = alloc(sizeof(Result));
 
     *result = (Result) {
-        .num_pixels = num_pixels,
+        .pixels_size = 4 * num_pixels,
         .pixels = pixels,
         .width = width,
         .height = height,
