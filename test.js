@@ -191,9 +191,9 @@ async function init() {
       name: 'points',
       type: SchemaTypes.array_ptr,
       schema: [
-        { name: 'x', type: SchemaTypes.f32 },
-        { name: 'y', type: SchemaTypes.f32 },
-        { name: 'tag', type: SchemaTypes.f32 },
+        { name: 'x', type: SchemaTypes.i32 },
+        { name: 'y', type: SchemaTypes.i32 },
+        { name: 'tag', type: SchemaTypes.i32 },
       ],
     },
   ];

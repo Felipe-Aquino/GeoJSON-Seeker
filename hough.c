@@ -86,8 +86,8 @@ typedef unsigned char uchar;
 typedef unsigned int uint;
 
 typedef struct Point {
-    float x, y;
-    float tag;
+    int x, y;
+    int tag;
 } Point;
 
 typedef struct Points {
@@ -271,7 +271,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
 
                     buckets[pos] += 1;
 
-                    Point p = { (float)col, (float)row, (float)pos };
+                    Point p = { col, row, pos };
                     da_append(&points, p);
                 }
             }
@@ -310,7 +310,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
         Point p = points.data[i];
 
         for (int j = 0; j < top_buckets_size; ++j) {
-            if (p.tag == (float)top_buckets[j].pos) {
+            if (p.tag == top_buckets[j].pos) {
                 int collision = 0;
 
                 for (int l = 0; l < k; ++l) {

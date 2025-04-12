@@ -51,7 +51,7 @@ int main() {
     for (int i = 0; i < r->points.size; ++i) {
         Point pt = r->points.data[i];
 
-        printf("(%f, %f): %.2f!\n", pt.x, pt.y, pt.tag);
+        printf("(%d, %d): %d!\n", pt.x, pt.y, pt.tag);
     }
 
     free(r->points.data);
