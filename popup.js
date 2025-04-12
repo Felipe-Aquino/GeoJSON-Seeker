@@ -119,12 +119,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 function getCanvas() {
+  const use_wasm = true;
   ctx.loading = true;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'get-canvas' }, (response) => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'get-canvas', use_wasm }, (response) => {
       console.log('content\'s response', response);
-      if (response.pixels) {
+      if (!use_wasm && response.pixels) {
         console.log('len', response.pixels.length);
         loadP5Image(response);
         ctx.loading = false;
@@ -133,7 +134,15 @@ function getCanvas() {
   });
 }
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'process-image-done') {
+    loadP5ImageFromWasm(message.result);
+    ctx.loading = false;
+  }
+});
+
 function listenClicks() {
+  console.log('@@ send listen clicks');
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, { action: 'listen-clicks' }, (response) => {
       console.log('listening clicks');
@@ -569,9 +578,19 @@ function simplify_points(points) {
 }
 
 let tick_time = Date.now();
+let total_tick_time = 0;
 function tick(msg) {
   if (msg) {
-    console.log('%s: %f s', msg, (Date.now() - tick_time) / 1000);
+    total_tick_time += (Date.now() - tick_time);
+
+    console.log(
+      '%s: %f s, total: %f s',
+      msg,
+      (Date.now() - tick_time) / 1000,
+      total_tick_time / 1000
+    );
+  } else {
+    total_tick_time = 0;
   }
 
   tick_time = Date.now();
@@ -694,6 +713,38 @@ function loadP5Image({ width, height, pixels }) {
   ctx.height = img2.height;
 
   ctx.showing_img = img2;
+
+  resizeCanvas(ctx.width, ctx.height);
+}
+
+function loadP5ImageFromWasm({
+  pixels,
+  width,
+  height,
+  offset_x,
+  offset_y,
+  points,
+}) {
+  ctx.img = createImage(width, height);
+  ctx.img.loadPixels();
+
+  for (let i = 0; i < pixels.length; i += 1) {
+    ctx.img.pixels[i] = pixels[i];
+  }
+
+  ctx.img.updatePixels();
+
+  ctx.offset = {
+    x: offset_x,
+    y: offset_y,
+  };
+
+  ctx.showing_img = ctx.img;
+
+  ctx.points = points;
+
+  ctx.width = width;
+  ctx.height = height;
 
   resizeCanvas(ctx.width, ctx.height);
 }

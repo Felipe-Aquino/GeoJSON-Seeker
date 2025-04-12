@@ -36,15 +36,19 @@ void free_all() {
     bump_pointer = (unsigned)(void *)&__heap_base;
 }
 
-#define DA_START_CAPACITY 3000 // 200
+#define DA_START_CAPACITY 2048
 
-#define MIN_DIST2 2 // 144
+#ifdef TEST
+#define MIN_DIST2 2
+#else
+#define MIN_DIST2 144
+#endif
 
 #include "buffer.c"
 
-#define printf(fmt, ...)                        \
+#define printf(...)                        \
     do {                                        \
-        buffer_format(fmt, __VA_ARGS__);        \
+        buffer_format(__VA_ARGS__);        \
         console_log(buffer.data, buffer.size);  \
         buffer.size = 0;                        \
     } while (0)
@@ -70,7 +74,7 @@ void free_all() {
                                                                          \
             if ((arr)->size >= (arr)->capacity) {                        \
                 int new_capacity = (int) (1.5 * (float)(arr)->capacity); \
-                alloc(new_capacity - (arr)->capacity);                   \
+                alloc((new_capacity - (arr)->capacity) * sizeof(value)); \
                 (arr)->capacity = new_capacity;                          \
             }                                                            \
         }                                                                \
@@ -135,13 +139,12 @@ void crop_image_in_place(uchar *pixels, int width, int height, int x, int y, int
     int start = 0;
 
     for (int y0 = y; y0 < y + dh; y0 += 1) {
-        for (int x0 = x; x0 < x + dw; x0 += 1) {
-            int pos = 4 * (y0 * width + x0);
+        const int r = y0 * width;
 
-            pixels[start + 0] = pixels[pos + 0];
-            pixels[start + 1] = pixels[pos + 1];
-            pixels[start + 2] = pixels[pos + 2];
-            pixels[start + 3] = pixels[pos + 3];
+        for (int x0 = x; x0 < x + dw; x0 += 1) {
+            int pos = 4 * (r + x0);
+
+            *(int *)(pixels + start) = *(int *)(pixels + pos);
 
             start += 4;
         }
@@ -211,7 +214,7 @@ Bounds get_area_bounds(uchar *pixels, int width, int height) {
 
 Result *points_of_interest(uchar *pixels, int width, int height) {
     Bounds bounds = get_area_bounds(pixels, width, height);
-    printf("min_x: %d, min_y: %d, max_x: %d, max_y: %d\n", bounds.min_x, bounds.min_y, bounds.max_y, bounds.max_y);
+    printf("min_x: %d, min_y: %d, max_x: %d, max_y: %d\n", bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y);
 
     const int pad =
 #ifndef TEST 
@@ -220,8 +223,8 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
          0;
 #endif
 
-    const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width);
-    const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height);
+    const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width - bounds.min_x);
+    const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height - bounds.min_y);
 
     Vec2i offset = {
         .x = MAX(bounds.min_x - pad, 0),
@@ -268,7 +271,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
 
                     buckets[pos] += 1;
 
-                    Point p = { (float)row, (float)col, (float)pos };
+                    Point p = { (float)col, (float)row, (float)pos };
                     da_append(&points, p);
                 }
             }
