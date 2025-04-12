@@ -20,7 +20,7 @@ function sleep(ms) {
   });
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message) => {
   console.log('@@ content got', message);
   if (message.action === 'get-canvas') {
     const all_canvas = document.getElementsByTagName('canvas');
@@ -43,21 +43,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ctx.readPixels(0, 0, canvas.width, canvas.height, ctx.RGBA, ctx.UNSIGNED_BYTE, pixels);
     }
 
-    if (!message.use_wasm) {
-      sendResponse({
-        pixels,
-        width: canvas.width,
-        height: canvas.height,
-      });
-    } else {
-      console.log('@@ sending msg');
-      chrome.runtime.sendMessage({
-        action: 'process-image',
-        pixels,
-        width: canvas.width,
-        height: canvas.height,
-      });
-    }
+    chrome.runtime.sendMessage({
+      action: 'process-image',
+      pixels,
+      width: canvas.width,
+      height: canvas.height,
+    });
   } else if (message.action === 'listen-clicks') {
     const all_canvas = document.getElementsByTagName('canvas');
 
@@ -113,7 +104,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
   }
-
-  // sendResponse({ data: 'unknown action' });
 });
 

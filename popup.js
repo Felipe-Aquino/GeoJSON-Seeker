@@ -5,7 +5,6 @@ const ctx = {
   width: total_width,
   height: total_height,
   img: null,
-  showing_img: null,
   offset: null,
   points: [],
   path: [],
@@ -23,7 +22,6 @@ const ctx = {
 
   clear() {
     this.img = null;
-    this.showing_img = null;
     this.offset = null;
     this.points = [];
     this.path = [];
@@ -119,18 +117,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 function getCanvas() {
-  const use_wasm = true;
   ctx.loading = true;
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'get-canvas', use_wasm }, (response) => {
-      console.log('content\'s response', response);
-      if (!use_wasm && response.pixels) {
-        console.log('len', response.pixels.length);
-        loadP5Image(response);
-        ctx.loading = false;
-      }
-    });
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'get-canvas' });
   });
 }
 
@@ -177,8 +167,8 @@ function setup() {
 function draw() {
   textAlign(LEFT, TOP);
 
-  if (ctx.showing_img) {
-    image(ctx.showing_img, 0, 0);
+  if (ctx.img) {
+    image(ctx.img, 0, 0);
   } else {
     // background(110);
     background(230);
@@ -214,7 +204,7 @@ function draw() {
     msg = 'Adicione 2 pontos no mapa';
   } else if (ctx.coords.length === 1) {
     msg = 'Adicione 1 ponto no mapa';
-  } else if (!ctx.showing_img && !ctx.loading) {
+  } else if (!ctx.img && !ctx.loading) {
     msg = 'Clique em Load Canvas';
   }
 
@@ -523,20 +513,6 @@ function loader(x, y, gap, r1, r2) {
   }
 }
 
-function isAround(x, value, p) {
-  return (((1 - p) * value <= x) && (x <= (1 + p) * value));
-}
-
-function testColor(r, g, b) {
-  const v = 0.1;
-
-  // ea4335
-  // e27a69
-  // e37867
-  return isAround(r, 0xea, v) && isAround(g, 0x43, v) && isAround(b, 0x35, v);
-  // return isAround(r, 0xf2, v) && isAround(g, 0x78, v) && isAround(b, 0x6b, v);
-}
-
 function pt_dist2(p1, p2) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -549,172 +525,6 @@ function swap_remove(arr, len, at) {
   arr[len - 1] = aux;
 
   return len - 1;
-}
-
-function simplify_points(points) {
-  const result = [];
-
-  let len = points.length;
-
-  for (let i = len - 1; i >= 0; i -= 1) {
-    const p1 = points[i];
-    len -= 1;
-
-    for (let j = len - 1; j >= 0; j -= 1) {
-      if (i !== j) {
-        const p2 = points[j];
-
-        if (pt_dist2(p1, p2) < 144) {
-          len = swap_remove(points, len, j);
-          i -= 1;
-        }
-      }
-    }
-
-    result.push(p1);
-  }
-
-  return result;
-}
-
-let tick_time = Date.now();
-let total_tick_time = 0;
-function tick(msg) {
-  if (msg) {
-    total_tick_time += (Date.now() - tick_time);
-
-    console.log(
-      '%s: %f s, total: %f s',
-      msg,
-      (Date.now() - tick_time) / 1000,
-      total_tick_time / 1000
-    );
-  } else {
-    total_tick_time = 0;
-  }
-
-  tick_time = Date.now();
-}
-
-function loadP5Image({ width, height, pixels }) {
-  tick();
-  ctx.img = createImage(width, height);
-  
-  ctx.img.loadPixels();
-
-  for (let i = 0; i < pixels.length; i += 1) {
-    ctx.img.pixels[i] = pixels[i];
-  }
-
-  ctx.img.updatePixels();
-  tick('copying');
-
-  const bounds = {
-    min_x: width,
-    min_y: height,
-    max_x: 0,
-    max_y: 0,
-  };
-
-  let numPixels = 4 * width * height;
-
-  let j = 0;
-
-  for (let i = 0; i < numPixels; i += 4) {
-    if (testColor(ctx.img.pixels[i], ctx.img.pixels[i + 1], ctx.img.pixels[i + 2])) {
-      const x = j % width;
-      const y = Math.floor(j / width);
-
-      if (x < bounds.min_x) {
-        bounds.min_x = x;
-      }
-
-      if (x > bounds.max_x) {
-        bounds.max_x = x;
-      }
-
-      if (y < bounds.min_y) {
-        bounds.min_y = y;
-      }
-
-      if (y > bounds.max_y) {
-        bounds.max_y = y;
-      }
-    }
-
-    j += 1;
-  }
-  tick('bounding');
-
-  const dw = bounds.max_x - bounds.min_x;
-  const dh = bounds.max_y - bounds.min_y;
-  const pad = 40;
-
-  ctx.offset = {
-    x: bounds.min_x - pad,
-    y: bounds.min_y - pad,
-  };
-
-  const img2 = createImage(dw + 2 * pad, dh + 2 * pad);
-
-  img2.blend(
-    ctx.img,
-    ctx.offset.x,
-    ctx.offset.y,
-    dw + 2 * pad,
-    dh + 2 * pad,
-
-    0,
-    0,
-    dw + 2 * pad,
-    dh + 2 * pad,
-    ADD
-  );
-
-  img2.loadPixels();
-  tick('blending');
-
-  numPixels = 4 * img2.width * img2.height;
-
-  // Black and white pixels used by hough algorithm
-  const bw_pixels = new Array(numPixels);
-
-  for (let i = 0; i < numPixels; i += 4) {
-    bw_pixels[i + 3] = 255;
-
-    if (testColor(img2.pixels[i], img2.pixels[i + 1], img2.pixels[i + 2])) {
-      bw_pixels[i] = 0;
-      bw_pixels[i + 1] = 0;
-      bw_pixels[i + 2] = 0;
-    } else {
-      bw_pixels[i] = 0xff;
-      bw_pixels[i + 1] = 0xff;
-      bw_pixels[i + 2] = 0xff;
-    }
-  }
-  tick('array copy');
-
-  // img3.updatePixels();
-
-  const hough = hough_create(bw_pixels, img2.width, img2.height);
-
-  hough_proccess(hough);
-  tick('processing');
-
-  ctx.points = hough_points_of_interest(hough);
-  console.log('points count', ctx.points.length);
-  tick('points of interest');
-
-  ctx.points = simplify_points(ctx.points);
-  console.log('points count', ctx.points.length);
-  tick('simplifying');
-
-  ctx.width = img2.width;
-  ctx.height = img2.height;
-
-  ctx.showing_img = img2;
-
-  resizeCanvas(ctx.width, ctx.height);
 }
 
 function loadP5ImageFromWasm({
@@ -738,8 +548,6 @@ function loadP5ImageFromWasm({
     x: offset_x,
     y: offset_y,
   };
-
-  ctx.showing_img = ctx.img;
 
   ctx.points = points;
 

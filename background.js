@@ -34,7 +34,6 @@ const wasm_context = {
 
   const { free_all, alloc, points_of_interest, memory } = wasm.instance.exports;
 
-  // memory.grow(1440);
   memory.grow(2048);
 
   function console_log(ptr, len) {
