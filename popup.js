@@ -178,7 +178,7 @@ function draw() {
   strokeWeight(2);
 
   // stroke(122, 244, 158);
-  stroke(0x26, 0x35, 0xd7)
+  stroke(0x26, 0x35, 0xd7);
   //stroke(0x7, 0x54, 0x1e);
 
 
@@ -225,7 +225,7 @@ function draw() {
   let y = 10 + ctx.scroll_offset.y;
 
   if (!ctx.canvas_loaded && button('Load Canvas', x, y)) {
-    if (ctx.coords.length == 2 && !ctx.loading) {
+    if (ctx.coords.length === 2 && !ctx.loading) {
       getCanvas();
       ctx.canvas_loaded = true;
     }
@@ -249,7 +249,11 @@ function draw() {
     if (icon_button(ui.path_icon, 'Conectar pontos', x, y)) {
       const ok = !(ctx.marking_points || ctx.removing_points);
       if (ok && ctx.path.length === 0) {
-        ctx.path = connect_points(ctx.points);
+        ctx.path = concave_hull(ctx.points, 4);
+
+        if (ctx.path === null) {
+          ctx.path = connect_points(ctx.points);
+        }
       } else if (ctx.path.length > 0) {
         ctx.path = [];
       }
@@ -514,9 +518,44 @@ function loader(x, y, gap, r1, r2) {
 }
 
 function pt_dist2(p1, p2) {
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    return dx * dx + dy * dy;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  return dx * dx + dy * dy;
+}
+
+function pt_equal(p1, p2) {
+  return p2.x === p1.x && p2.y === p1.y;
+}
+
+function pt_sub(p1, p2) {
+  return {
+    x: p1.x - p2.x,
+    y: p1.y - p2.y,
+  };
+}
+
+function pt_angle_y_inverted(pt1, pt2) {
+  const ang = Math.atan(-(pt2.y - pt1.y) / (pt2.x - pt1.x));
+
+  if (ang >= 0) {
+    if (pt2.x >= pt1.x) {
+      return ang;
+    }
+
+    return ang + Math.PI;
+  } else {
+    if (pt2.x < pt1.x) {
+      return ang + Math.PI;
+    }
+
+    return ang + 2 * Math.PI;
+  }
+}
+
+function swap(arr, i, j) {
+  const aux = arr[i];
+  arr[i] = arr[j];
+  arr[j] = aux;
 }
 
 function swap_remove(arr, len, at) {
@@ -589,6 +628,249 @@ function connect_points(points) {
   }
 
   return path;
+}
+
+function find_max_y_point_idx(points) {
+  let max_y = points[0].y;
+  let idx = 0;
+
+  for (let i = 1; i < points.length; ++i) {
+    if (points[i].y > max_y) {
+      max_y = points[i].y;
+      idx = i;
+    }
+  }
+
+  return idx;
+}
+
+function find_k_nearest_neighbors(points, n, current_point, k) {
+  const result = [];
+
+  let max_dist = 0;
+  let max_dist_idx = -1;
+
+  for (let i = 0; i < n; ++i) {
+    const dist = pt_dist2(current_point, points[i]);
+
+    if (dist < max_dist || result.length != k) {
+      if (result.length === k) {
+        result[max_dist_idx] = {
+          point: points[i],
+          idx: i,
+        };
+      } else {
+        result.push({ point: points[i], idx: i });
+      }
+
+      max_dist = 0;
+
+      for (let j = 0; j < result.length; ++j) {
+        const d = pt_dist2(current_point, result[j].point);
+
+        if (max_dist < d) {
+          max_dist = d;
+          max_dist_idx = j;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// Solve 2x2 Ax = b matrix equation
+function solve_Ax_b_equation(col1, col2, b) {
+  const det = col1.x * col2.y - col2.x * col1.y;
+
+  if (det === 0.0) {
+    return null;
+  }
+
+  return {
+    x: ( col2.y * b.x - col2.x * b.y) / det,
+    y: (-col1.y * b.x + col1.x * b.y) / det,
+  };
+}
+
+function intersects(p1, p2, p3, p4) {
+  const r = solve_Ax_b_equation(
+    pt_sub(p2, p1),
+    pt_sub(p3, p4),
+    pt_sub(p3, p1)
+  );
+
+  if (r === null) {
+    return false;
+  }
+
+  const u = r.x;
+  const v = r.y;
+
+  return 0 < u && u <= 1 && 0 < v && v <= 1;
+}
+
+function point_in_polygon(polygon, point) {
+    let is_inside = false;
+
+    for (let i = 0; i < polygon.length - 1; i += 1) {
+        const p1 = polygon[i];
+        const p2 = polygon[i + 1];
+
+        const min_y = Math.min(p1.y, p2.y);
+        const max_y = Math.max(p1.y, p2.y);
+
+        if (pt_equal(point, p1) || pt_equal(point, p2)) {
+            is_inside = true;
+            break;
+        }
+
+        if (min_y <= point.y && point.y <= max_y && min_y != max_y) {
+            const max_x = Math.max(p1.x, p2.x);
+
+            if (point.x < max_x) {
+                if (p1.x == p2.x) {
+                    is_inside = !is_inside;
+                } else {
+                    const x_ray_intersection =
+                        ((point.y - p1.y) * (p2.x - p1.x)) / (p2.y - p1.y) +
+                        p1.x; 
+
+                    if (x_ray_intersection > point.x) {
+                        is_inside = !is_inside;
+
+                        if (x_ray_intersection == p1.x) {
+                            const i0 = (i + polygon.length - 1) % polygon.length;
+                            const p0 = polygon[i0];
+
+                            if ((p2.y < point.y && p0.y >= point.y) ||
+                                (p0.y < point.y && p2.y >= point.y)) {
+                                is_inside = !is_inside;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return is_inside;
+}
+
+function concave_hull(points, k) {
+  let n = points.length;
+
+  if (k > 12 || k > n) {
+    return null;
+  }
+
+  if (n < 3) {
+    return [];
+  }
+
+  if (n === 3) {
+    return points.slice();
+  }
+
+  k = Math.min(Math.max(k, 3), n - 1);
+
+  const idx = find_max_y_point_idx(points);
+  const first_point = points[idx];
+  let current_point = first_point;
+
+  n = swap_remove(points, n, idx);
+
+  const hull = [first_point];
+
+  let prev_angle = 0;
+  let step = 1;
+
+  while (n > 0) {
+    if (step === 4) {
+      // The first point is at the end of the array, we are bringing it back
+      swap(points, points.length - 1, n);
+      n += 1;
+    }
+
+    const neighbors = find_k_nearest_neighbors(points, n, current_point, k);
+
+    neighbors.sort((n1, n2) => {
+      const p1 = n1.point;
+      const p2 = n2.point;
+
+      // fmod not always loop around, so this e factor almost asures that
+      const e = 1e-12;
+      const factor = 2 * Math.PI - prev_angle + e;
+
+      const ang1 = (pt_angle_y_inverted(current_point, p1) + factor) % (2 * Math.PI);
+      const ang2 = (pt_angle_y_inverted(current_point, p2) + factor) % (2 * Math.PI);
+
+      if (ang1 === ang2) {
+        const d1 = pt_dist2(current_point, p1);
+        const d2 = pt_dist2(current_point, p2);
+
+        return d1 - d2;
+      }
+
+      return ang2 - ang1;
+    });
+
+    let all_intersects = false;
+    let i = 0;
+
+    for (; i < neighbors.length; ++i) {
+      const last_point = pt_equal(neighbors[i].point, first_point)
+        ? 1
+        : 0;
+
+      all_intersects = false;
+
+      for (let j = 1; j < hull.length - last_point; ++j) {
+        all_intersects = intersects(
+          hull[step - 1],
+          neighbors[i].point,
+          hull[step - 1 - j],
+          hull[step - j]
+        );
+
+        if (all_intersects) {
+          break;
+        }
+      }
+
+      if (!all_intersects) {
+        break;
+      }
+    }
+
+    if (all_intersects) {
+      if (k == 11) {
+        return hull;
+        console.log('intersection fail');
+      }
+      return concave_hull(points, k + 1); 
+    }
+
+    current_point = neighbors[i].point;
+    hull.push(current_point);
+
+    prev_angle = pt_angle_y_inverted(hull[step], hull[step - 1]);
+    n = swap_remove(points, n, neighbors[i].idx);
+
+    if (pt_equal(first_point, current_point)) {
+      break;
+    }
+
+    step += 1;
+  }
+
+  for (let j = points.length - 1; j >= 0; --j) {
+    if (!point_in_polygon(hull, points[j])) {
+      return concave_hull(points, k + 1); 
+    }
+  }
+
+  return hull;
 }
 
 function geojson_to_clipboard(path, coords, offset) {
