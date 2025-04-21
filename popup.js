@@ -52,6 +52,8 @@ const ui = {
   broom_icon: null,
   clipboard_icon: null,
 
+  show_buttons: true,
+
   reset() {
     this.last_hot_id = this.hot_id;
     this.hot_id = -1;
@@ -170,17 +172,13 @@ function draw() {
   if (ctx.img) {
     image(ctx.img, 0, 0);
   } else {
-    // background(110);
     background(230);
   }
 
   noFill();
   strokeWeight(2);
 
-  // stroke(122, 244, 158);
   stroke(0x26, 0x35, 0xd7);
-  //stroke(0x7, 0x54, 0x1e);
-
 
   if (ctx.path.length === 0) {
     for (const point of ctx.points) {
@@ -224,14 +222,14 @@ function draw() {
   let x = 10 + ctx.scroll_offset.x;
   let y = 10 + ctx.scroll_offset.y;
 
-  if (!ctx.canvas_loaded && button('Load Canvas', x, y)) {
+  if (ui.show_buttons && !ctx.canvas_loaded && button('Load Canvas', x, y)) {
     if (ctx.coords.length === 2 && !ctx.loading) {
       getCanvas();
       ctx.canvas_loaded = true;
     }
   }
 
-  if (ctx.canvas_loaded && !ctx.loading) {
+  if (ui.show_buttons && ctx.canvas_loaded && !ctx.loading) {
     if (icon_button(ui.pin_icon, 'Marcar pontos', x, y, ctx.marking_points)) {
       ctx.path = [];
       ctx.marking_points = !ctx.marking_points;
@@ -268,22 +266,29 @@ function draw() {
   const editing = ctx.marking_points || ctx.removing_points;
 
   y = ctx.scroll_offset.y + total_height - 110;
-  if (!editing && button('Ver Coords', x, y)) {
+  if (ui.show_buttons && !editing && button('Ver Coords', x, y)) {
     ctx.show_coords = !ctx.show_coords;
   }
 
-  if (ctx.show_coords) {
+  if (ui.show_buttons && ctx.show_coords) {
     const w = textWidth('Limpar Coords') + 20;
     points_table(ctx.coords, x + w, y - 40);
   }
 
   y += 50;
-  if (!editing &&  button('Limpar Coords', x, y)) {
+  if (ui.show_buttons && !editing && button('Limpar Coords', x, y)) {
     setState('coords', '');
     listenClicks();
 
     ctx.clear();
     resizeCanvas(ctx.width, ctx.height);
+  }
+
+  x = ctx.scroll_offset.x + 2;
+  y = ctx.scroll_offset.y + total_height / 2;
+
+  if (ctx.canvas_loaded && show_hide_button(x, y, !ui.show_buttons)) {
+    ui.show_buttons = !ui.show_buttons;
   }
 
   ui.reset();
@@ -351,8 +356,6 @@ function button(name, x, y) {
   }
   
   strokeWeight(0.5);
-  // stroke(0, 0xd1, 0xb2);
-  // stroke(0x7, 0x54, 0x1e);
   stroke(0x27, 0x74, 0x2e);
 
   rect(x, y, w, h, r);
@@ -403,8 +406,6 @@ function icon_button(icon, name, x, y, toggle) {
   }
   
   strokeWeight(0.5);
-  // stroke(0, 0xd1, 0xb2);
-  // stroke(0x7, 0x54, 0x1e);
   stroke(0x27, 0x74, 0x2e);
 
   const w2 = ui.hot_id === id || toggle
@@ -422,6 +423,54 @@ function icon_button(icon, name, x, y, toggle) {
     const x2 = x + icon.width + 8 + 6;
     text(name, x2, y + h / 2 - 7);
   }
+  
+  return clicked;
+}
+
+function show_hide_button(x, y, is_hidden) {
+  const id = ui.cyrb53('<>', x * y);
+
+  strokeWeight(0.5);
+  textStyle(NORMAL);
+  textSize(16);
+
+  const name = is_hidden ? String.fromCharCode(187) : String.fromCharCode(171);
+
+  const w = textWidth(name) + 8;
+  const h = 40;
+  const r = 2;
+
+  let a = 0xa0;
+  
+  let clicked = false;
+  if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h) {
+    ui.hot_id = id;
+
+    if (mouseIsPressed) {
+      ui.pressed_id  = id;
+      if (id !== ui.last_pressed_id) {
+        clicked = true;
+      }
+
+      fill(0x33, 0x33, 0x33);
+    } else {
+      fill(21, 188, 163);
+    }
+
+    a = 0xff;
+  } else {
+    fill(0, 0xd1, 0xb2, a);
+  }
+  
+  strokeWeight(0.5);
+  stroke(0x27, 0x74, 0x2e, a);
+
+  rect(x, y, w, h, r);
+  
+  fill(0xff, 0xff, 0xff, a);
+  noStroke();
+
+  text(name, x + 4, y + h / 2 - 7);
   
   return clicked;
 }
