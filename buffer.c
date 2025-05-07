@@ -94,7 +94,7 @@ void buffer_format(const char *fmt, ...) {
           break;
         case 'f':
           flt = (float)va_arg(args, double);
-          buffer_write_int(n);
+          buffer_write_float(flt);
           break;
         case 's':
           str = va_arg(args, char *);

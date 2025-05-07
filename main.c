@@ -1,99 +1,360 @@
-// #include <stdio.h>
+#include "common.h"
+#include "buffer.c"
+#include "c2d.h"
+#include "ui.c"
 
-typedef int (*cmp_t)(void *arr, int i, int j);
+#define printf(...)                             \
+    do {                                        \
+        buffer_format(__VA_ARGS__);             \
+        console_log(buffer.data, buffer.size);  \
+        buffer.size = 0;                        \
+    } while (0)
 
-void swap(void *arr, int i, int j, int sz) {
-    if (i != j) {
-        char *a = (char *)arr + i * sz;
-        char *b = (char *)arr + j * sz;
+void console_log(char *ptr, int len);
 
-        for (int k = 0; k < sz; k += 1) {
-            char aux = *a;
-            *a = *b;
-            *b = aux;
+#include "concave_hull.c"
 
-            a++;
-            b++;
+#include "assets.c"
+
+
+void load_map();
+
+extern unsigned char __heap_base;
+unsigned bump_pointer = (unsigned)(void *)&__heap_base;
+unsigned last_pointer = (unsigned)(void *)&__heap_base;
+
+void *alloc(int n) {
+    n += (4 - n % 4) % 4;
+
+    printf("from %d, alloc: %d", bump_pointer, n);
+    last_pointer = bump_pointer;
+    bump_pointer += n;
+    return (void *) last_pointer;
+}
+
+// This is used to dealloc a temporary memory
+void reset_last_alloc(void *ptr) {
+    if ((unsigned)ptr == last_pointer) {
+        bump_pointer = last_pointer;
+    } else {
+        printf("WARN: trying to reset_last_alloc");
+    }
+}
+
+void free_all() {
+    bump_pointer = (unsigned)(void *)&__heap_base;
+}
+
+typedef struct Context {
+    Result *result;
+    Points path;
+
+    bool canvas_loaded;
+    bool loading;
+    float loader_offset;
+
+    // coords
+
+    int scroll_offset_x;
+    int scroll_offset_y;
+
+    bool show_buttons;
+
+    bool marking_points;
+    bool removing_points;
+
+} Context;
+
+Context ctx = {};
+
+void set_mouse_position(float x, float y) {
+    ui_set_mouse_position(x, y);
+}
+
+void set_mouse_pressed(bool p) {
+    ui_set_mouse_pressed(p);
+
+    if (p && ctx.result) {
+        if (ctx.marking_points) {
+            Vec2i pt = {
+                ctx.scroll_offset_x + ui.mouse_x,
+                ctx.scroll_offset_y + ui.mouse_y,
+            };
+
+            da_append(&ctx.result->points, pt);
+        }
+
+        if (ctx.removing_points) {
+            Vec2i pt = {
+                ctx.scroll_offset_x + ui.mouse_x,
+                ctx.scroll_offset_y + ui.mouse_y,
+            };
+
+            for (int i = 0; i < ctx.result->points.size; ++i) {
+                if (v2i_dist2(pt, ctx.result->points.data[i]) <= 25) {
+                    da_swap_remove(&ctx.result->points, i);
+                    break;
+                }
+            }
         }
     }
 }
 
-__attribute__((visibility("default")))
-void qsort(void *arr, int n, int sz, cmp_t cmp) {
-    if (n < 2) {
-        return;
+void set_mouse_wheel(float dx, float dy) {
+    ui_set_mouse_wheel(dx, dy);
+}
+
+enum AssetEnum {
+    BROOM = 0,
+    CLIPBOARD,
+    PIN,
+    ROUTE,
+    ASSET_COUNT,
+};
+
+Image asset_images[ASSET_COUNT] = {};
+
+Image expand_asset_img(Asset *asset) {
+    char *data = &assets_data[asset->offset];
+
+    const int asset_size = asset->width * asset->height;
+    const int total_pixels = asset_size * 4;
+
+    Image img = {
+        .width = asset->width,
+        .height = asset->height,
+        .pixels = alloc(total_pixels),
+    };
+
+    for (int i = 0; i < asset_size; i += 1) {
+        img.pixels[i] = (Color) { 255, 255, 255, data[i] };
     }
 
-    int p = n / 2;
-    int i = 0;
-    int j = n - 1;
+    return img;
+}
 
-    while (i < j) {
-        if (cmp(arr, i, p) > 0) {
-            swap(arr, i, p, sz);
-            i += 1;
-        } else if (cmp(arr, j, p) < 0) {
-            swap(arr, j, p, sz);
-            j -= 1;
-        } else if (cmp(arr, i, j) > 0) {
-            swap(arr, i, j, sz);
+void init() {
+    ctx = (Context) {
+        .result = NULL,
 
-            if (i < p && cmp(arr, i, p) < 0) {
-                i += 1;
-            }
+        .canvas_loaded = false,
+        .loading = false,
+        .loader_offset = 0.f,
 
-            if (j > p && cmp(arr, j, p) > 0) {
-                j -= 1;
+        .scroll_offset_x = 0,
+        .scroll_offset_y = 0,
+
+        .show_buttons = true,
+
+        .marking_points = false,
+        .removing_points = false,
+    };
+
+    for (int i = 0; i < ASSET_COUNT; ++i) {
+        asset_images[i] = expand_asset_img(&assets[i]);
+    }
+}
+
+void set_process_result(Result *result) {
+    ctx.result = result;
+    ctx.loading = false;
+    ctx.canvas_loaded = true;
+}
+
+void loader(float delta_time, int x, int y, int gap, float r1, float r2);
+Points connect_points(Points points);
+
+void update(float dt, float width, float height) {
+    c2d_set_fill_color(230, 230, 230, 255);
+    c2d_fill_quad(0, 0, width, height);
+
+    if (ctx.result) {
+        c2d_image_a(
+            ctx.result->pixels,
+            ctx.scroll_offset_x,
+            ctx.scroll_offset_y,
+            0,
+            0,
+            ctx.result->width,
+            ctx.result->height
+        );
+
+
+        c2d_set_stroke_color(0x26, 0x35, 0xd7, 0xff);
+
+        if (ctx.path.size) {
+            Vec2i offset = { ctx.scroll_offset_x, ctx.scroll_offset_y };
+            for (int i = 0; i < ctx.path.size - 1; ++i) {
+                Vec2i p1 = v2i_sub(ctx.path.data[i], offset);
+                Vec2i p2 = v2i_sub(ctx.path.data[i + 1], offset);
+
+                c2d_line(p1.x, p1.y, p2.x, p2.y, 3);
             }
         } else {
-            i += 1;
-            j -= 1;
+            for (int i = 0; i < ctx.result->points.size; ++i) {
+                Vec2i p = ctx.result->points.data[i];
+
+                c2d_circle(p.x - ctx.scroll_offset_x, p.y - ctx.scroll_offset_y, 5, 2);
+            }
         }
     }
 
-    qsort(arr, n / 2, sz, cmp);
+    char *msg = NULL;
 
-    char *arr2 = (char *)arr + sz * (n / 2);
-    qsort(arr2, n - (n / 2), sz, cmp);
+    // if (ctx.coords.length === 0) {
+    //   msg = "Adicione 2 pontos no mapa";
+    // } else if (ctx.coords.length === 1) {
+    //   msg = "Adicione 1 ponto no mapa";
+    // } else
+    if (!ctx.canvas_loaded && !ctx.loading) {
+        msg = "Clique em Load Canvas";
+    }
+
+    if (msg) {
+        c2d_set_fill_color(0, 0, 0, 255);
+        int w = c2d_text_width2(msg, 20);
+        c2d_fill_text2(msg, (width - w) / 2, (height - 10) / 2, 20);
+    }
+
+    if (ctx.loading) {
+        loader(dt, width / 2, height / 2, 5, 50.f, 5.f);
+    }
+
+    int x = 10;
+    int y = 10;
+
+    if (ctx.show_buttons && !ctx.canvas_loaded && button("Load Canvas", x, y)) {
+        // if (ctx.coords.length === 2 && !ctx.loading) {
+        //   getCanvas();
+        //   ctx.canvas_loaded = true;
+        // }
+        load_map();
+        // ctx.canvas_loaded = true;
+        ctx.loading = true;
+    }
+
+    if (ctx.show_buttons && ctx.canvas_loaded && !ctx.loading) {
+        if (icon_button(asset_images[PIN], "Marcar pontos", x, y, ctx.marking_points)) {
+            // ctx.path = [];
+            ctx.marking_points = !ctx.marking_points;
+            ctx.removing_points = false;
+        }
+
+        y += 50;
+        if (icon_button(asset_images[BROOM], "Remover pontos", x, y, ctx.removing_points)) {
+            // ctx.path = [];
+            ctx.marking_points = false;
+            ctx.removing_points = !ctx.removing_points;
+        }
+
+        y += 50;
+        if (icon_button(asset_images[ROUTE], "Conectar pontos", x, y, false)) {
+            bool ok = !!ctx.result && !(ctx.marking_points || ctx.removing_points);
+
+            if (ok && ctx.path.size == 0) {
+                ctx.path = connect_points(ctx.result->points);
+            } else if (ctx.path.size > 0) {
+                reset_last_alloc(ctx.path.data);
+            }
+        }
+
+        y += 50;
+        // if (ctx.path.length > 0 && icon_button(ui.clipboard_icon, "Copiar", x, y)) {
+        //   geojson_to_clipboard(ctx.path, ctx.coords, ctx.offset);
+        // }
+    }
+
+    bool editing = ctx.marking_points || ctx.removing_points;
+
+    y = height - 110;
+
+    y += 50;
+
+    if (ctx.show_buttons && !editing && button("Limpar Coords", x, y)) {
+        // setState("coords", "");
+        // listenClicks();
+        // ctx.clear();
+        // resizeCanvas(ctx.width, ctx.height);
+    }
+
+    x = 2;
+    y = (height - 40) / 2;
+
+    if (ctx.canvas_loaded && show_hide_button(x, y, !ctx.show_buttons)) {
+        ctx.show_buttons = !ctx.show_buttons;
+    }
+
+    if (ctx.result) {
+        ctx.scroll_offset_y = vscrolbar(width, height, (float)ctx.result->height);
+        ctx.scroll_offset_x = hscrolbar(height, width, (float)ctx.result->width);
+    }
+
+    ui_reset();
 }
 
-int int_cmp(void *arr, int i, int j) {
-    int *arr2 = (int *)arr;
+void loader(float delta_time, int x, int y, int gap, float r1, float r2) { 
+    float k = r2 / (2.f * r1);
+    float theta = atanf(2 * k * sqrtf(1 - k * k) / (1 - 2 * k * k));
+    int n = 2 * PI * r1 / (theta * r1 + gap);
 
-    return arr2[i] - arr2[j];
+    for (int i = 0; i < n; ++i) {
+        float ang = 2 * PI * i / n;
+        float x1 = x + r1 * cosf(ang) + r1 * sinf(ang);
+        float y1 = y + r1 * cosf(ang) - r1 * sinf(ang);
+
+        int alfa = 255 - ((int)(ctx.loader_offset + (float)i) % n) * 255 / n;
+        c2d_set_fill_color(0, 0, 0, alfa);
+
+        c2d_fill_circle(x1, y1, r2);
+    }
+
+    const float speed = 20;
+
+    ctx.loader_offset += speed * delta_time;
+
+    if (ctx.loader_offset >= (float)n) {
+        ctx.loader_offset = 0.f;
+    }
 }
 
-/*
-int main() {
-    int values[10] = { 30, 1, 15, 20, 10, 5, 0, 7, 40, 32 };
+Points connect_points(Points points) {
+    for (int k = 4; k < MAX_NEIGHBORS; ++k) {
+        Points path = concave_hull(points, k);
 
-    for (int i = 0; i < 10; i += 1) {
-        printf("%d ", values[i]);
+        if (path.size > 0) {
+            return path;
+        }
     }
-    printf("\n");
 
-    qsort(values, sizeof(values) / sizeof(int), sizeof(int), int_cmp);
+    printf("hull not found");
 
-    for (int i = 0; i < 10; i += 1) {
-        printf("%d ", values[i]);
+    int idx = 0; // points.size * Math.random();
+
+    Vec2i p1 = points.data[idx];
+    da_swap_remove(&points, idx);
+
+    Points path = {};
+    da_append(&path, p1);
+
+    while (points.size > 0) {
+        int min_dist = 2e9;
+        int min_dist_idx = -1;
+
+        for (int j = points.size - 1; j >= 0; j -= 1) {
+            Vec2i p2 = points.data[j];
+
+            if (min_dist > v2i_dist2(p1, p2)) {
+                min_dist = v2i_dist2(p1, p2);
+                min_dist_idx = j;
+            }
+        }
+
+        p1 = points.data[min_dist_idx];
+        da_swap_remove(&points, min_dist_idx);
+
+        da_append(&path, p1);
     }
-    printf("\n");
-    printf("\n");
 
-    int values2[11] = { 30, 1, 15, 20, 10, 5, 0, 7, 40, 32, 20 };
-
-    for (int i = 0; i < 11; i += 1) {
-        printf("%d ", values2[i]);
-    }
-    printf("\n");
-
-    qsort(values2, sizeof(values2) / sizeof(int), sizeof(int), int_cmp);
-
-    for (int i = 0; i < 11; i += 1) {
-        printf("%d ", values2[i]);
-    }
-    printf("\n");
-
-    return 0;
+    return path;
 }
-*/
+

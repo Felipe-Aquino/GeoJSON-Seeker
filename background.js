@@ -21,6 +21,8 @@ const wasm_context = {
   alloc: null,
   points_of_interest: null,
   memory: null,
+
+  result: null,
 };
 
 (async function() {
@@ -179,7 +181,7 @@ const schema = [
   { name: 'height', type: SchemaTypes.i32 },
   { name: 'offset_x', type: SchemaTypes.i32 },
   { name: 'offset_y', type: SchemaTypes.i32 },
-  { name: '_', type: SchemaTypes.i32 },
+  { name: 'points_capacity', type: SchemaTypes.i32 },
   {
     name: 'points',
     type: SchemaTypes.array_ptr,
@@ -214,6 +216,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('@ bg got msg');
 
   if (message.action === 'process-image') {
+    if (wasm_context.result) {
+      console.log('@ returning a cached result');
+
+      chrome.runtime.sendMessage({
+        action: 'process-image-done',
+        result: wasm_context.result,
+      });
+      return;
+    }
+
     console.log('@ processing image', message);
     // sendResponse({ magic: true });
 
@@ -237,11 +249,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
     tick('processing');
 
-    console.log('result_ptr', result_ptr);
     const [result] = obj_decoder(wasm_context.memory.buffer, schema, result_ptr);
+    console.log('result_ptr', result_ptr);
     tick('decoding');
 
     console.log(result);
+
     wasm_context.free_all();
 
     chrome.runtime.sendMessage({ action: 'process-image-done', result });
