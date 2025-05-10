@@ -27,6 +27,8 @@ async function initWasm(module_path) {
 
       // Interop functions
       load_map,
+      clear_coords,
+      geojson_to_clipboard,
     },
   };
 
@@ -56,6 +58,7 @@ async function initWasm(module_path) {
     init: wasm.instance.exports.init,
     update: wasm.instance.exports.update,
     set_process_result: wasm.instance.exports.set_process_result,
+    set_coord: wasm.instance.exports.set_coord,
 
     ui_set_mouse_position: wasm.instance.exports.set_mouse_position,
     ui_set_mouse_pressed: wasm.instance.exports.set_mouse_pressed,
@@ -116,6 +119,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   app = await create_app();
   app.wasm.init();
 
+  await load_coords();
+
   let start_timestamp = 0;
 
   const render_frame = (timestamp) => {
@@ -133,10 +138,56 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 });
 
+// Function to retrieve state
+async function get_state(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, (result) => {
+      resolve(result[key]);
+    });
+  });
+}
+
+function set_state(key, value) {
+  const data = {};
+  data[key] = value;
+  chrome.storage.local.set(data, () => {
+    console.log('State saved:', key, value);
+  });
+}
+
+function clear_coords() {
+  set_state('coords', '');
+  listen_clicks();
+}
+
+async function load_coords() {
+  let coords = await get_state('coords');
+
+  if (coords) {
+    coords = JSON.parse(coords);
+
+    console.log('coords', coords);
+
+    for (let i = 0; i < coords.length; ++i) {
+      const coord = coords[i];
+      app.wasm.set_coord(i, coord.x, coord.y, coord.lat, coord.lng);
+    }
+  } else {
+    listen_clicks();
+  }
+}
+
 // Chrome messaging
 function load_map() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, { action: 'load-map' });
+  });
+}
+
+function listen_clicks() {
+  console.log('@@ send listen clicks');
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'listen-clicks' });
   });
 }
 
@@ -359,4 +410,61 @@ function c2d_image_s(ptr, x, y, w, h, dw, dh) {
 
   app.display.bg_ctx.putImageData(new ImageData(pixels, w, h), 0, 0);
   app.display.ctx.drawImage(app.display.bg_ctx.canvas, 0, 0, w, h, x, y, dw, dh);
+}
+
+function geojson_to_clipboard(path_ptr, path_len, coords_ptr, coords_len, offset_x, offset_y) {
+  const path = new Int32Array(
+    app.wasm.memory.buffer,
+    path_ptr,
+    path_len * 2
+  );
+
+  const coords = new Float32Array(
+    app.wasm.memory.buffer,
+    coords_ptr,
+    coords_len * 4
+  );
+
+  const coord1 = {
+    x: coords[0],
+    y: coords[1],
+    lat: coords[2],
+    lng: coords[3],
+  };
+
+  const coord2 = {
+    x: coords[4],
+    y: coords[5],
+    lat: coords[6],
+    lng: coords[7],
+  };
+
+  const lng_per_pixel = (coord2.lng - coord1.lng) / (coord2.x - coord1.x);
+  const lat_per_pixel = (coord2.lat - coord1.lat) / (coord2.y - coord1.y);
+
+  const lnglats = [];
+
+  for (let i = 0; i < path.length; i += 2) {
+    const pt = { x: path[i], y: path[i + 1] };
+
+    lnglats.push([
+      lng_per_pixel * (pt.x + offset_x - coord1.x) + coord1.lng,
+      lat_per_pixel * (pt.y + offset_y - coord1.y) + coord1.lat - 0.000085,
+    ]);
+  }
+
+  console.log('lat_per_pixel', lat_per_pixel);
+  console.log('lng_per_pixel', lng_per_pixel);
+  console.log('offset_x', offset_x);
+  console.log('offset_y', offset_y);
+  console.log(coords);
+  console.log(coord1);
+  console.log(path[0], path[1]);
+  console.log(path[2], path[3]);
+  console.log(lnglats[0]);
+  lnglats.push(lnglats[0]);
+
+  const geojson = JSON.stringify({ type: 'Polygon', coordinates: [lnglats] });
+
+  navigator.clipboard.writeText(geojson);
 }

@@ -17,7 +17,15 @@ void console_log(char *ptr, int len);
 #include "assets.c"
 
 
+struct Coord;
+
 void load_map();
+void clear_coords();
+void geojson_to_clipboard(
+    Vec2i *points_ptr, int points_len,
+    struct Coord *coords_ptr, int coords_len,
+    int offset_x, int offset_y
+);
 
 extern unsigned char __heap_base;
 unsigned bump_pointer = (unsigned)(void *)&__heap_base;
@@ -26,7 +34,6 @@ unsigned last_pointer = (unsigned)(void *)&__heap_base;
 void *alloc(int n) {
     n += (4 - n % 4) % 4;
 
-    printf("from %d, alloc: %d", bump_pointer, n);
     last_pointer = bump_pointer;
     bump_pointer += n;
     return (void *) last_pointer;
@@ -41,9 +48,26 @@ void reset_last_alloc(void *ptr) {
     }
 }
 
+// This function can corrupt the memory
+void reset_alloc(void *ptr) {
+    if (ptr) {
+        last_pointer = (unsigned)ptr;
+        bump_pointer = (unsigned)ptr;
+    }
+}
+
 void free_all() {
     bump_pointer = (unsigned)(void *)&__heap_base;
 }
+
+typedef struct Coord {
+    float x, y, lat, lng;
+} Coord;
+
+typedef struct Coords {
+    int size;
+    Coord *data;
+} Coords;
 
 typedef struct Context {
     Result *result;
@@ -53,7 +77,7 @@ typedef struct Context {
     bool loading;
     float loader_offset;
 
-    // coords
+    Coords coords;
 
     int scroll_offset_x;
     int scroll_offset_y;
@@ -65,7 +89,7 @@ typedef struct Context {
 
 } Context;
 
-Context ctx = {};
+Context ctx;
 
 void set_mouse_position(float x, float y) {
     ui_set_mouse_position(x, y);
@@ -74,6 +98,10 @@ void set_mouse_position(float x, float y) {
 void set_mouse_pressed(bool p) {
     ui_set_mouse_pressed(p);
 
+    if (ui.hot_id != -1 || ui.last_hot_id != -1) {
+        return;
+    }
+
     if (p && ctx.result) {
         if (ctx.marking_points) {
             Vec2i pt = {
@@ -81,7 +109,18 @@ void set_mouse_pressed(bool p) {
                 ctx.scroll_offset_y + ui.mouse_y,
             };
 
-            da_append(&ctx.result->points, pt);
+            bool exists = false;
+
+            for (int i = 0; i < ctx.result->points.size; ++i) {
+                if (v2i_dist2(pt, ctx.result->points.data[i]) <= 25) {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                da_append(&ctx.result->points, pt);
+            }
         }
 
         if (ctx.removing_points) {
@@ -134,12 +173,19 @@ Image expand_asset_img(Asset *asset) {
 }
 
 void init() {
+    Coords coords = {
+        .size = 0,
+        .data = alloc(2 * sizeof(Coord)),
+    };
+
     ctx = (Context) {
         .result = NULL,
 
         .canvas_loaded = false,
         .loading = false,
         .loader_offset = 0.f,
+
+        .coords = coords,
 
         .scroll_offset_x = 0,
         .scroll_offset_y = 0,
@@ -159,6 +205,16 @@ void set_process_result(Result *result) {
     ctx.result = result;
     ctx.loading = false;
     ctx.canvas_loaded = true;
+}
+
+void set_coord(int at, float x, float y, float lat, float lng) {
+    if (at < 2) {
+        printf("set coord at :d", at);
+        ctx.coords.size = at + 1;
+        ctx.coords.data[at] = (Coord) { x, y, lat, lng };
+    } else {
+        ctx.coords.size = 0;
+    }
 }
 
 void loader(float delta_time, int x, int y, int gap, float r1, float r2);
@@ -201,12 +257,11 @@ void update(float dt, float width, float height) {
 
     char *msg = NULL;
 
-    // if (ctx.coords.length === 0) {
-    //   msg = "Adicione 2 pontos no mapa";
-    // } else if (ctx.coords.length === 1) {
-    //   msg = "Adicione 1 ponto no mapa";
-    // } else
-    if (!ctx.canvas_loaded && !ctx.loading) {
+    if (ctx.coords.size == 0) {
+        msg = "Adicione 2 pontos no mapa";
+    } else if (ctx.coords.size == 1) {
+        msg = "Adicione 1 ponto no mapa";
+    } else if (!ctx.canvas_loaded && !ctx.loading) {
         msg = "Clique em Load Canvas";
     }
 
@@ -224,25 +279,26 @@ void update(float dt, float width, float height) {
     int y = 10;
 
     if (ctx.show_buttons && !ctx.canvas_loaded && button("Load Canvas", x, y)) {
-        // if (ctx.coords.length === 2 && !ctx.loading) {
-        //   getCanvas();
-        //   ctx.canvas_loaded = true;
-        // }
-        load_map();
-        // ctx.canvas_loaded = true;
-        ctx.loading = true;
+        if (ctx.coords.size == 2 && !ctx.loading) {
+            load_map();
+            ctx.loading = true;
+        }
     }
 
     if (ctx.show_buttons && ctx.canvas_loaded && !ctx.loading) {
         if (icon_button(asset_images[PIN], "Marcar pontos", x, y, ctx.marking_points)) {
-            // ctx.path = [];
+            reset_last_alloc(ctx.path.data);
+            ctx.path = (Points) { 0, 0, NULL };
+
             ctx.marking_points = !ctx.marking_points;
             ctx.removing_points = false;
         }
 
         y += 50;
         if (icon_button(asset_images[BROOM], "Remover pontos", x, y, ctx.removing_points)) {
-            // ctx.path = [];
+            reset_last_alloc(ctx.path.data);
+            ctx.path = (Points) { 0, 0, NULL };
+
             ctx.marking_points = false;
             ctx.removing_points = !ctx.removing_points;
         }
@@ -259,9 +315,20 @@ void update(float dt, float width, float height) {
         }
 
         y += 50;
-        // if (ctx.path.length > 0 && icon_button(ui.clipboard_icon, "Copiar", x, y)) {
-        //   geojson_to_clipboard(ctx.path, ctx.coords, ctx.offset);
-        // }
+        if (ctx.path.size > 0 && icon_button(asset_images[CLIPBOARD], "Copiar", x, y, false)) {
+            printf(
+              "coord1: x = %f, y = %f, lat = %f, lng = %f",
+              ctx.coords.data[0].x,
+              ctx.coords.data[0].y,
+              ctx.coords.data[0].lat,
+              ctx.coords.data[0].lng
+            );
+            geojson_to_clipboard(
+                ctx.path.data, ctx.path.size,
+                ctx.coords.data, ctx.coords.size,
+                ctx.result->offset.x, ctx.result->offset.y
+            );
+        }
     }
 
     bool editing = ctx.marking_points || ctx.removing_points;
@@ -271,10 +338,20 @@ void update(float dt, float width, float height) {
     y += 50;
 
     if (ctx.show_buttons && !editing && button("Limpar Coords", x, y)) {
-        // setState("coords", "");
-        // listenClicks();
-        // ctx.clear();
-        // resizeCanvas(ctx.width, ctx.height);
+        clear_coords();
+
+        reset_alloc(ctx.result);
+
+        ctx.canvas_loaded = false;
+        ctx.loading = false;
+
+        ctx.result = NULL;
+        ctx.path = (Points) { 0, 0, NULL };
+        ctx.removing_points = false;
+        ctx.marking_points = false;
+        ctx.coords.size = 0;
+
+        ui_scroll_reset();
     }
 
     x = 2;

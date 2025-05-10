@@ -8,11 +8,6 @@ typedef struct UI {
     int pressed_id;
     int last_pressed_id;
 
-    // pin_icon: null,
-    // path_icon: null,
-    // broom_icon: null,
-    // clipboard_icon: null,
-
     bool show_buttons;
 
     int mouse_x;
@@ -92,6 +87,11 @@ void ui_set_mouse_wheel(float dx, float dy) {
 
     ui.scroll_offset_x += (int) dx;
     ui.scroll_offset_y += (int) dy;
+}
+
+void ui_scroll_reset() {
+    ui.scroll_offset_x = 0;
+    ui.scroll_offset_y = 0;
 }
 
 bool button(const char *name, int x, int y) {
