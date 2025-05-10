@@ -3,12 +3,17 @@
 #include "c2d.h"
 #include "ui.c"
 
-#define printf(...)                             \
-    do {                                        \
-        buffer_format(__VA_ARGS__);             \
-        console_log(buffer.data, buffer.size);  \
-        buffer.size = 0;                        \
-    } while (0)
+// Disable it to make the build even smaller
+#ifndef DISABLE_PRINTF
+#    define printf(...)                             \
+        do {                                        \
+            buffer_format(__VA_ARGS__);             \
+            console_log(buffer.data, buffer.size);  \
+            buffer.size = 0;                        \
+        } while (0)
+#else
+#    define printf(...)
+#endif
 
 void console_log(char *ptr, int len);
 
