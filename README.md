@@ -2,12 +2,14 @@
 
 Uma extensão capaz de extrair GeoJSON a partir de contornos no Google Maps.
 
-https://github.com/user-attachments/assets/1225d01b-89b7-4831-bc3a-ab8b504b34fa
+https://github.com/user-attachments/assets/e8971694-ecb8-4ed9-a07b-515ad1c1c4a0
 
 ## Sobre 
 
-Tem como única dependência a biblioteca [p5js](https://p5js.org) para tratar eventos de canvas.
+Escrito primáriamente em C compilado para WebAssembly, sem emscripten.
 
 ## Ploblemas
 
-Pode ser impactado por ataulizações do Google Maps, por que para encontrar os pontos inciais é preciso encontrar um elemento com uma classe específica.
+- Pode ser impactado por atualizações do Google Maps, pois depende da cor usada no contorno da região.
+- Ainda não funciona com WebGL.
+- É necessário adicionar suporte para chrome. Só funciona com Firefox.
