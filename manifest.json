@@ -22,7 +22,8 @@
   "permissions": [
     "webRequest",
     "activeTab",
-    "storage"
+    "storage",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "https://www.google.com/maps*"
@@ -32,7 +33,16 @@
       "matches": [
         "https://www.google.com/maps*"
       ],
-      "js": ["content.js"]
+      "js": ["hack.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.google.com/maps*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start"
     }
   ]
 }

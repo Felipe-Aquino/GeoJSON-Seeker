@@ -4,7 +4,7 @@ STACK_SIZE=8388608
 WASM_FLAGS=--target=wasm32 -flto -nostdlib -Wl,--no-entry -Wl,--allow-undefined -Wl,--export-all -Wl,--lto-O3
 WASM_FLAGS2=--target=wasm32 -flto -nostdlib -Wl,--no-entry -Wl,--allow-undefined -Wl,--lto-O3
 
-EXPORTED_NAMES=alloc init update set_process_result set_coord set_mouse_position set_mouse_pressed set_mouse_wheel
+EXPORTED_NAMES=alloc init update set_process_result set_is_loading set_mouse_position set_mouse_pressed set_mouse_wheel
 EXPORT_FLAG=$(foreach name,$(EXPORTED_NAMES),-Wl,--export=$(name))
 PRINTF=-DDISABLE_PRINTF
 

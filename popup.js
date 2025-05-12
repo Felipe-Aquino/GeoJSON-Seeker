@@ -27,7 +27,6 @@ async function initWasm(module_path) {
 
       // Interop functions
       load_map,
-      clear_coords,
       geojson_to_clipboard,
     },
   };
@@ -58,7 +57,7 @@ async function initWasm(module_path) {
     init: wasm.instance.exports.init,
     update: wasm.instance.exports.update,
     set_process_result: wasm.instance.exports.set_process_result,
-    set_coord: wasm.instance.exports.set_coord,
+    set_is_loading: wasm.instance.exports.set_is_loading,
 
     ui_set_mouse_position: wasm.instance.exports.set_mouse_position,
     ui_set_mouse_pressed: wasm.instance.exports.set_mouse_pressed,
@@ -112,14 +111,12 @@ async function create_app() {
   const wasm = await initWasm('main.wasm');
   const display = create_display();
 
-  return { wasm, display };
+  return { wasm, display, coords: [], geojson_clipboard_params: [] };
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
   app = await create_app();
   app.wasm.init();
-
-  await load_coords();
 
   let start_timestamp = 0;
 
@@ -138,45 +135,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 });
 
-// Function to retrieve state
-async function get_state(key) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(key, (result) => {
-      resolve(result[key]);
-    });
-  });
-}
-
-function set_state(key, value) {
-  const data = {};
-  data[key] = value;
-  chrome.storage.local.set(data, () => {
-    console.log('State saved:', key, value);
-  });
-}
-
-function clear_coords() {
-  set_state('coords', '');
-  listen_clicks();
-}
-
-async function load_coords() {
-  let coords = await get_state('coords');
-
-  if (coords) {
-    coords = JSON.parse(coords);
-
-    console.log('coords', coords);
-
-    for (let i = 0; i < coords.length; ++i) {
-      const coord = coords[i];
-      app.wasm.set_coord(i, coord.x, coord.y, coord.lat, coord.lng);
-    }
-  } else {
-    listen_clicks();
-  }
-}
-
 // Chrome messaging
 function load_map() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -184,10 +142,12 @@ function load_map() {
   });
 }
 
-function listen_clicks() {
-  console.log('@@ send listen clicks');
+function get_auto_coords() {
+  app.wasm.set_is_loading(true);
+
+  console.log('@@ auto coords');
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'listen-clicks' });
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'get-auto-coords' });
   });
 }
 
@@ -223,13 +183,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
 
     points.set(
-      //result.points.map(({ x, y, tag }) => [x, y, tag]).flat()
       result.points.map(({ x, y }) => [x, y]).flat()
     );
-
-    // navigator.clipboard.writeText(
-    //   result.points.map(({ x, y }) => `Vec2i{${x}, ${y}}`).join()
-    // );
 
     r.set([
       image_len,
@@ -245,16 +200,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     app.wasm.set_process_result(result_ptr);
   }
-});
 
-function listen_clicks() {
-  console.log('@@ send listen clicks');
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'listen-clicks' }, (response) => {
-      console.log('@@ listening clicks');
-    });
-  });
-}
+  if (message.action === 'coords-loaded') {
+    app.wasm.set_is_loading(false);
+
+    app.coords = message.coords;
+    geojson_to_clipboard(...app.geojson_clipboard_params);
+  } else if (message.action === 'coords-not-loaded') {
+    // TODO: Maybe add an error treatment
+  }
+});
 
 // Registering mouse events
 
@@ -412,32 +367,20 @@ function c2d_image_s(ptr, x, y, w, h, dw, dh) {
   app.display.ctx.drawImage(app.display.bg_ctx.canvas, 0, 0, w, h, x, y, dw, dh);
 }
 
-function geojson_to_clipboard(path_ptr, path_len, coords_ptr, coords_len, offset_x, offset_y) {
+function geojson_to_clipboard(path_ptr, path_len, offset_x, offset_y) {
+  if (app.coords.length < 2) {
+    get_auto_coords();
+    app.geojson_clipboard_params = [path_ptr, path_len, offset_x, offset_y];
+    return;
+  }
+
   const path = new Int32Array(
     app.wasm.memory.buffer,
     path_ptr,
     path_len * 2
   );
 
-  const coords = new Float32Array(
-    app.wasm.memory.buffer,
-    coords_ptr,
-    coords_len * 4
-  );
-
-  const coord1 = {
-    x: coords[0],
-    y: coords[1],
-    lat: coords[2],
-    lng: coords[3],
-  };
-
-  const coord2 = {
-    x: coords[4],
-    y: coords[5],
-    lat: coords[6],
-    lng: coords[7],
-  };
+  const [coord1, coord2] = app.coords;
 
   const lng_per_pixel = (coord2.lng - coord1.lng) / (coord2.x - coord1.x);
   const lat_per_pixel = (coord2.lat - coord1.lat) / (coord2.y - coord1.y);
@@ -451,17 +394,14 @@ function geojson_to_clipboard(path_ptr, path_len, coords_ptr, coords_len, offset
       lng_per_pixel * (pt.x + offset_x - coord1.x) + coord1.lng,
       lat_per_pixel * (pt.y + offset_y - coord1.y) + coord1.lat - 0.000085,
     ]);
+
+    if (i < 3) {
+      console.log(lng_per_pixel, pt.x, offset_x, coord1.x, coord1.lng);
+    }
   }
 
-  console.log('lat_per_pixel', lat_per_pixel);
-  console.log('lng_per_pixel', lng_per_pixel);
-  console.log('offset_x', offset_x);
-  console.log('offset_y', offset_y);
-  console.log(coords);
-  console.log(coord1);
-  console.log(path[0], path[1]);
-  console.log(path[2], path[3]);
   console.log(lnglats[0]);
+
   lnglats.push(lnglats[0]);
 
   const geojson = JSON.stringify({ type: 'Polygon', coordinates: [lnglats] });

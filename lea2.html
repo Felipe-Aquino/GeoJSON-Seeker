@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+
+
+     <!-- Make sure you put this AFTER Leaflet's CSS -->
+     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin="">
+     </script>
+
+     <style>
+        #map {
+          height: 800px;
+          width: 800px;
+        }
+     </style>
+
+
+    <script>
+      var layer = null;
+      var map = null;
+
+      function loadlayer() {
+        const geojsonInput = document.getElementById('geojson-input');
+        const json = JSON.parse(geojsonInput.value);
+
+        if (json) {
+          if (layer) {
+             layer.remove();
+          }
+
+          layer = L.polygon(json.coordinates[0].map(([a, b]) => [b, a])).addTo(map);
+
+          const group = new L.FeatureGroup([layer]);
+
+          map.fitBounds(group.getBounds());
+        }
+      }
+
+      setTimeout(async () => {
+        map = L.map('map').setView([51.505, -0.09], 13);
+
+        L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+          maxZoom: 20,
+          subdomains:['mt0','mt1','mt2','mt3'],
+          attribution:
+            '&copy; <a href="https://www.google.com/maps">Google Maps</a>',
+        }).addTo(map);
+      }, 1000);
+
+    </script>
+  </head>
+
+  <body>
+    <div style="margin: 3px" style="display: flex; flex-direction: row">
+      <input id="geojson-input" class="input" type="text" name="latlngs" placeholder="GeoJSON"/>
+      <button
+        style="margin-left: 5px"
+        class="button is-primary"
+        onclick="loadlayer()"
+      >
+        Load
+      </button>
+    </div>
+
+    <div id="map"></div>
+  </body>
+</html>

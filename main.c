@@ -22,13 +22,9 @@ void console_log(char *ptr, int len);
 #include "assets.c"
 
 
-struct Coord;
-
 void load_map();
-void clear_coords();
 void geojson_to_clipboard(
     Vec2i *points_ptr, int points_len,
-    struct Coord *coords_ptr, int coords_len,
     int offset_x, int offset_y
 );
 
@@ -65,15 +61,6 @@ void free_all() {
     bump_pointer = (unsigned)(void *)&__heap_base;
 }
 
-typedef struct Coord {
-    float x, y, lat, lng;
-} Coord;
-
-typedef struct Coords {
-    int size;
-    Coord *data;
-} Coords;
-
 typedef struct Context {
     Result *result;
     Points path;
@@ -82,8 +69,6 @@ typedef struct Context {
     bool loading;
     float loader_offset;
 
-    Coords coords;
-
     int scroll_offset_x;
     int scroll_offset_y;
 
@@ -91,10 +76,13 @@ typedef struct Context {
 
     bool marking_points;
     bool removing_points;
-
 } Context;
 
 Context ctx;
+
+void set_is_loading(bool value) {
+    ctx.loading = value;
+}
 
 void set_mouse_position(float x, float y) {
     ui_set_mouse_position(x, y);
@@ -178,19 +166,12 @@ Image expand_asset_img(Asset *asset) {
 }
 
 void init() {
-    Coords coords = {
-        .size = 0,
-        .data = alloc(2 * sizeof(Coord)),
-    };
-
     ctx = (Context) {
         .result = NULL,
 
         .canvas_loaded = false,
         .loading = false,
         .loader_offset = 0.f,
-
-        .coords = coords,
 
         .scroll_offset_x = 0,
         .scroll_offset_y = 0,
@@ -210,16 +191,6 @@ void set_process_result(Result *result) {
     ctx.result = result;
     ctx.loading = false;
     ctx.canvas_loaded = true;
-}
-
-void set_coord(int at, float x, float y, float lat, float lng) {
-    if (at < 2) {
-        printf("set coord at :d", at);
-        ctx.coords.size = at + 1;
-        ctx.coords.data[at] = (Coord) { x, y, lat, lng };
-    } else {
-        ctx.coords.size = 0;
-    }
 }
 
 void loader(float delta_time, int x, int y, int gap, float r1, float r2);
@@ -260,17 +231,9 @@ void update(float dt, float width, float height) {
         }
     }
 
-    char *msg = NULL;
+    if (!ctx.canvas_loaded && !ctx.loading) {
+        const char *msg = "Clique em Load Canvas";
 
-    if (ctx.coords.size == 0) {
-        msg = "Adicione 2 pontos no mapa";
-    } else if (ctx.coords.size == 1) {
-        msg = "Adicione 1 ponto no mapa";
-    } else if (!ctx.canvas_loaded && !ctx.loading) {
-        msg = "Clique em Load Canvas";
-    }
-
-    if (msg) {
         c2d_set_fill_color(0, 0, 0, 255);
         int w = c2d_text_width2(msg, 20);
         c2d_fill_text2(msg, (width - w) / 2, (height - 10) / 2, 20);
@@ -284,7 +247,7 @@ void update(float dt, float width, float height) {
     int y = 10;
 
     if (ctx.show_buttons && !ctx.canvas_loaded && button("Load Canvas", x, y)) {
-        if (ctx.coords.size == 2 && !ctx.loading) {
+        if (!ctx.loading) {
             load_map();
             ctx.loading = true;
         }
@@ -321,43 +284,14 @@ void update(float dt, float width, float height) {
 
         y += 50;
         if (ctx.path.size > 0 && icon_button(asset_images[CLIPBOARD], "Copiar", x, y, false)) {
-            printf(
-              "coord1: x = %f, y = %f, lat = %f, lng = %f",
-              ctx.coords.data[0].x,
-              ctx.coords.data[0].y,
-              ctx.coords.data[0].lat,
-              ctx.coords.data[0].lng
-            );
             geojson_to_clipboard(
                 ctx.path.data, ctx.path.size,
-                ctx.coords.data, ctx.coords.size,
                 ctx.result->offset.x, ctx.result->offset.y
             );
         }
     }
 
     bool editing = ctx.marking_points || ctx.removing_points;
-
-    y = height - 110;
-
-    y += 50;
-
-    if (ctx.show_buttons && !editing && button("Limpar Coords", x, y)) {
-        clear_coords();
-
-        reset_alloc(ctx.result);
-
-        ctx.canvas_loaded = false;
-        ctx.loading = false;
-
-        ctx.result = NULL;
-        ctx.path = (Points) { 0, 0, NULL };
-        ctx.removing_points = false;
-        ctx.marking_points = false;
-        ctx.coords.size = 0;
-
-        ui_scroll_reset();
-    }
 
     x = 2;
     y = (height - 40) / 2;
