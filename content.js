@@ -259,6 +259,7 @@ function process_image(message) {
 
     wasm_context.free_all();
 
+    result.pixels = Array.from(result.pixels);
     chrome.runtime.sendMessage({ action: 'process-image-done', result });
 }
 
