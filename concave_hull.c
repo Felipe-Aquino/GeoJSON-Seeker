@@ -136,6 +136,10 @@ bool point_in_polygon(Points polygon, Vec2i point) {
             if (point.x < max_x) {
                 if (p1.x == p2.x) {
                     is_inside = !is_inside;
+
+                    if (point.y == p1.y) {
+                      is_inside = !is_inside;
+                    }
                 } else {
                     float x_ray_intersection =
                         (float)((point.y - p1.y) * (p2.x - p1.x)) / (float)(p2.y - p1.y) +
