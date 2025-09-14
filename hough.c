@@ -147,23 +147,39 @@ void crop_image_in_place(uchar *pixels, int width, int height, int x, int y, int
     }
 }
 
-#define IS_AROUND(x, value, p) \
-    (((1 - p) * (float)(value) <= (float)(x)) && ((float)(x) <= (1 + p) * (float)(value)))
+Color colors[7] = {
+    { 0xea, 0x43, 0x35, 0xff }, // contour
+    { 0x90, 0xda, 0xee, 0xff }, // sea
+    { 0xed, 0xe4, 0xca, 0xff }, // beach
+    { 0xd3, 0xf8, 0xe2, 0xff }, // vegetation
+    { 0xeb, 0xea, 0xea, 0xff }, // residence
+    { 0xd8, 0xe0, 0xe7, 0xff }, // street
+    { 0x8b, 0xa5, 0xc1, 0xff }, // highway
+};
 
 int test_color(Color c) {
-    const float v = 0.1;
+    const float v = 0.07;
+    const Color ref = colors[0];
 
-    const Color ref =
-#ifndef TEST
-    { 0xea, 0x43, 0x35, 0xff };
-#else
-    { 0x00, 0x00, 0x00, 0xff };
-#endif
+    for (int i = 1; i < 7; ++i) {
+        float t1 = (float)(c.r - ref.r) / (float)(colors[i].r - ref.r);
+        float t2 = (float)(c.g - ref.g) / (float)(colors[i].g - ref.g);
+        float t3 = (float)(c.b - ref.b) / (float)(colors[i].b - ref.b);
 
-    return IS_AROUND(c.r, ref.r, v) && IS_AROUND(c.g, ref.g, v) && IS_AROUND(c.b, ref.b, v);
+        int ok = (t2 - t1) < v && (t1 - t2) < v &&
+                 (t3 - t1) < v && (t1 - t3) < v &&
+                 (t3 - t2) < v && (t2 - t3) < v &&
+                  0 <= t1 && t1 < 0.3 &&
+                  0 <= t2 && t2 < 0.3 &&
+                  0 <= t3 && t3 < 0.3;
+
+        if (ok) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
-
-#undef IS_AROUND
 
 Bounds get_area_bounds(uchar *pixels, int width, int height) {
     Bounds bounds = {
@@ -225,6 +241,7 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
 
     crop_image_in_place(pixels, width, height, offset.x, offset.y, dw, dh);
 
+    printf("w: %d, h: %d, dw: %d, dh: %d", width, height, dw, dh);
     width = dw;
     height = dh;
 
@@ -257,7 +274,6 @@ Result *points_of_interest(uchar *pixels, int width, int height) {
 
             for (int ang_idx = 0; ang_idx < ANGLES_DIVISION_COUNT; ang_idx += 1) {
                 float r = col * angles[ang_idx].x + row * angles[ang_idx].y;
-
                 if (r > 0) {
                     int rad_idx = r / RADIUS_STEP;
                     int pos = ang_idx + rad_idx * ANGLES_DIVISION_COUNT;
