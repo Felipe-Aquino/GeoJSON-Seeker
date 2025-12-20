@@ -247,7 +247,8 @@ function process_image(message) {
     const result_ptr = wasm_context.points_of_interest(
       image_ptr,
       message.width,
-      message.height
+      message.height,
+      message.is_webgl ? 1 : 0
     );
     tick('processing');
 
@@ -279,13 +280,14 @@ chrome.runtime.onMessage.addListener(async (message) => {
   if (message.action === 'load-map') {
     const all_canvas = document.getElementsByTagName('canvas');
 
-    const canvas = all_canvas[0];
+    const [canvas, canvas2] = all_canvas;
 
     if (!canvas) {
       console.log('@@ canvas not found');
       return;
     }
 
+    let is_webgl = false;
     let pixels = null;
 
     if (canvas.getContext('2d')) {
@@ -294,18 +296,25 @@ chrome.runtime.onMessage.addListener(async (message) => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       pixels = imageData.data;
-    } else if (canvas.getContext('webgl')) {
-      const ctx = canvas.getContext('webgl');
+    } else if (canvas2) {
+      // Getting pixels if the browser use webgl
+      const offscreenCanvas = document.createElement("canvas");
+      offscreenCanvas.width = canvas2.width;
+      offscreenCanvas.height = canvas2.height;
+      ctx = offscreenCanvas.getContext("2d");
+      ctx.drawImage(canvas2, 0, 0);
 
-      pixels = new Uint8Array(canvas.width * canvas.height * 4);
+      imageData = ctx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+      pixels = imageData.data;
 
-      ctx.readPixels(0, 0, canvas.width, canvas.height, ctx.RGBA, ctx.UNSIGNED_BYTE, pixels);
+      is_webgl = true;
     }
 
     process_image({
       pixels,
       width: canvas.width,
       height: canvas.height,
+      is_webgl,
     });
   }
 

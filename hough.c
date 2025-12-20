@@ -147,7 +147,7 @@ void crop_image_in_place(uchar *pixels, int width, int height, int x, int y, int
     }
 }
 
-Color colors[7] = {
+static Color colors_ctx2d[7] = {
     { 0xea, 0x43, 0x35, 0xff }, // contour
     { 0x90, 0xda, 0xee, 0xff }, // sea
     { 0xed, 0xe4, 0xca, 0xff }, // beach
@@ -156,6 +156,18 @@ Color colors[7] = {
     { 0xd8, 0xe0, 0xe7, 0xff }, // street
     { 0x8b, 0xa5, 0xc1, 0xff }, // highway
 };
+
+static Color colors_webgl[7] = {
+    { 0xe9, 0x42, 0x35, 0xff }, // contour
+    { 0x91, 0xd4, 0xe5, 0xff }, // sea
+    { 0xee, 0xe4, 0xc8, 0xff }, // beach
+    { 0xd3, 0xf7, 0xe1, 0xff }, // vegetation
+    { 0xec, 0xeb, 0xeb, 0xff }, // residence
+    { 0xd7, 0xe0, 0xe5, 0xff }, // street
+    { 0x8b, 0xa3, 0xbc, 0xff }, // highway
+};
+
+static Color *colors = colors_webgl;
 
 int test_color(Color c) {
     const float v = 0.07;
@@ -221,7 +233,14 @@ Bounds get_area_bounds(uchar *pixels, int width, int height) {
 #define RADIUS_STEP 4
 #define ANGLES_DIVISION_COUNT 50
 
-Result *points_of_interest(uchar *pixels, int width, int height) {
+Result *points_of_interest(uchar *pixels, int width, int height, int is_webgl) {
+    printf("is_webgl: %d", is_webgl);
+    if (is_webgl) {
+        colors = colors_webgl;
+    } else {
+        colors = colors_ctx2d;
+    }
+
     Bounds bounds = get_area_bounds(pixels, width, height);
 
     const int pad =
