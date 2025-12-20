@@ -1,5 +1,5 @@
 const total_width = 800 * 0.95;
-const total_height = 600 * 0.90;
+const total_height = 560;
 
 let app;
 

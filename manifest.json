@@ -13,12 +13,6 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },
-  "background": {
-    "type": "module",
-    "scripts": [
-        "background.js"
-    ]
-  },
   "permissions": [
     "webRequest",
     "activeTab",
@@ -43,6 +37,12 @@
       ],
       "js": ["content.js"],
       "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["hough.wasm"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
