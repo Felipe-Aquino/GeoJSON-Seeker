@@ -145,7 +145,7 @@ function load_map() {
 function get_auto_coords() {
   app.wasm.set_is_loading(true);
 
-  console.log('@@ auto coords');
+  // console.log('@@ auto coords');
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, { action: 'get-auto-coords' });
   });

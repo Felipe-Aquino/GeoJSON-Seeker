@@ -42,9 +42,9 @@ void free_all() {
 
 #include "buffer.c"
 
-#define printf(...)                        \
+#define printf(...)                             \
     do {                                        \
-        buffer_format(__VA_ARGS__);        \
+        buffer_format(__VA_ARGS__);             \
         console_log(buffer.data, buffer.size);  \
         buffer.size = 0;                        \
     } while (0)
