@@ -1,7 +1,3 @@
-#include <stdbool.h>
-#include "common.h"
-#include "c2d.h"
-
 typedef struct UI {
     int hot_id;
     int last_hot_id;

@@ -1,65 +1,19 @@
-#include "common.h"
-#include "buffer.c"
-#include "c2d.h"
-#include "ui.c"
-
-// Disable it to make the build even smaller
-#ifndef DISABLE_PRINTF
-#    define printf(...)                             \
-        do {                                        \
-            buffer_format(__VA_ARGS__);             \
-            console_log(buffer.data, buffer.size);  \
-            buffer.size = 0;                        \
-        } while (0)
-#else
-#    define printf(...)
-#endif
-
-void console_log(char *ptr, int len);
-
-#include "concave_hull.c"
-
-#include "assets.c"
-
-
 void load_map();
+
 void geojson_to_clipboard(
     Vec2i *points_ptr, int points_len,
     int offset_x, int offset_y
 );
 
-extern unsigned char __heap_base;
-unsigned bump_pointer = (unsigned)(void *)&__heap_base;
-unsigned last_pointer = (unsigned)(void *)&__heap_base;
+typedef struct Result {
+    int pixels_size;
+    uchar *pixels;
+    int width;
+    int height;
 
-void *alloc(int n) {
-    n += (4 - n % 4) % 4;
-
-    last_pointer = bump_pointer;
-    bump_pointer += n;
-    return (void *) last_pointer;
-}
-
-// This is used to dealloc a temporary memory
-void reset_last_alloc(void *ptr) {
-    if ((unsigned)ptr == last_pointer) {
-        bump_pointer = last_pointer;
-    } else {
-        printf("WARN: trying to reset_last_alloc");
-    }
-}
-
-// This function can corrupt the memory
-void reset_alloc(void *ptr) {
-    if (ptr) {
-        last_pointer = (unsigned)ptr;
-        bump_pointer = (unsigned)ptr;
-    }
-}
-
-void free_all() {
-    bump_pointer = (unsigned)(void *)&__heap_base;
-}
+    Vec2i offset;
+    Points points;
+} Result;
 
 typedef struct Context {
     Result *result;

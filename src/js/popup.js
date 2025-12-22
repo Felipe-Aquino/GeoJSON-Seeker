@@ -108,7 +108,7 @@ function create_display() {
 }
 
 async function create_app() {
-  const wasm = await initWasm('main.wasm');
+  const wasm = await initWasm('../../popup.wasm');
   const display = create_display();
 
   return { wasm, display, coords: [], geojson_clipboard_params: [] };

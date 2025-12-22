@@ -1,6 +1,3 @@
-#ifndef _SORT_H_
-#define _SORT_H_
-
 typedef int (*sort_cmp_t)(void *arr, int i, int j, void *data);
 
 void sort_swap(void *arr, int i, int j, int sz) {
@@ -52,6 +49,3 @@ void bubble_sort(void *arr, int n, int sz, sort_cmp_t cmp, void *data) {
         }
     }
 }
-
-
-#endif // _SORT_H_

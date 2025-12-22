@@ -30,7 +30,7 @@ const wasm_context = {
 let auto_coord = null;
 
 (async function() {
-  const wasm = await initWasm('hough.wasm', {
+  const wasm = await initWasm('../../content.wasm', {
     'env': {
       sinf: Math.sin,
       cosf: Math.cos,

@@ -1,16 +1,8 @@
-#include "common.h"
-#include "sort.c"
-
-#define NAN (__builtin_nanf (""))
-#define isnan(x) __builtin_isnan (x)
-
-// #define NAN 10000000.f
-// #define isnan(x) x == NAN
-
-float fmodf(float a, float b) {
-    int q = (int)(a / b);
-    return a - b * (float)q;
-}
+typedef struct Points {
+    int capacity;
+    int size;
+    Vec2i *data;
+} Points;
 
 typedef struct Neighbor {
     Vec2i point;

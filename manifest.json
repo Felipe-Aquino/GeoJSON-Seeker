@@ -8,7 +8,7 @@
       "16": "assets/road_map_16px.png",
       "32": "assets/road_map_32px.png"
     },
-    "default_popup": "popup.html"
+    "default_popup": "src/popup.html"
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
@@ -27,7 +27,7 @@
       "matches": [
         "https://www.google.com/maps*"
       ],
-      "js": ["hack.js"],
+      "js": ["src/js/interceptor.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
@@ -35,13 +35,13 @@
       "matches": [
         "https://www.google.com/maps*"
       ],
-      "js": ["schema.js", "content.js"],
+      "js": ["src/js/schema.js", "src/js/content.js"],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["hough.wasm"],
+      "resources": ["content.wasm"],
       "matches": ["<all_urls>"]
     }
   ]

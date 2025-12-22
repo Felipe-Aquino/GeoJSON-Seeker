@@ -1,82 +1,8 @@
-#ifdef NATIVE
-#include <stdio.h>
-#include <math.h>
-
-#define alloc malloc
-
-#define DA_START_CAPACITY 3000
-
-#define MIN_DIST2 2
-
-
-#else
-#define sqrtf __builtin_sqrtf
-
-float sinf(float);
-float cosf(float);
-
-void console_log(char *ptr, int len);
-
-extern unsigned char __heap_base;
-unsigned bump_pointer = (unsigned)(void *)&__heap_base;
-
-void *alloc(int n) {
-    n += (4 - n % 4) % 4;
-
-    unsigned r = bump_pointer;
-    bump_pointer += n;
-    return (void *)r;
-}
-
-void free_all() {
-    bump_pointer = (unsigned)(void *)&__heap_base;
-}
-
-#define DA_START_CAPACITY 2048
-
 #ifdef TEST
 #define MIN_DIST2 2
 #else
 #define MIN_DIST2 144
 #endif
-
-#include "buffer.c"
-
-#define printf(...)                             \
-    do {                                        \
-        buffer_format(__VA_ARGS__);             \
-        console_log(buffer.data, buffer.size);  \
-        buffer.size = 0;                        \
-    } while (0)
-
-#endif
-
-
-#define PI 3.1415926f
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-// Linear apend
-#define da_append(arr, value)                                            \
-    do {                                                                 \
-        if ((arr)->capacity == 0) {                                      \
-            (arr)->size = 1;                                             \
-            (arr)->capacity = DA_START_CAPACITY;                         \
-                                                                         \
-            (arr)->data = alloc((arr)->capacity * sizeof(value));        \
-        } else {                                                         \
-            (arr)->size += 1;                                            \
-                                                                         \
-            if ((arr)->size >= (arr)->capacity) {                        \
-                int new_capacity = (int) (1.5 * (float)(arr)->capacity); \
-                alloc((new_capacity - (arr)->capacity) * sizeof(value)); \
-                (arr)->capacity = new_capacity;                          \
-            }                                                            \
-        }                                                                \
-                                                                         \
-        (arr)->data[(arr)->size - 1] = (value);                          \
-    } while (0)
 
 typedef unsigned char uchar;
 typedef unsigned int uint;
@@ -91,18 +17,6 @@ typedef struct Points {
     int size;
     Point *data;
 } Points;
-
-typedef struct Vec2f {
-    float x, y;
-} Vec2f;
-
-typedef struct Vec2i {
-    int x, y;
-} Vec2i;
-
-typedef struct Color {
-    uchar r, g, b, a;
-} Color;
 
 typedef struct BucketInfo {
     int pos, count;
@@ -359,11 +273,6 @@ Result *points_of_interest(uchar *pixels, int width, int height, int is_webgl) {
     }
 
     points.size = k;
-
-#ifdef NATIVE
-    free(buckets);
-    free(top_buckets);
-#endif
 
     Result *result = alloc(sizeof(Result));
 

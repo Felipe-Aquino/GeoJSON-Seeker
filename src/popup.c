@@ -1,0 +1,10 @@
+#include <stdbool.h>
+#include <stdarg.h>
+#include "assets.c"
+#include "buffer.c"
+#include "core.c"
+#include "sort.c"
+#include "concave_hull.c"
+#include "c2d.h"
+#include "ui.c"
+#include "context.c"

@@ -1,15 +1,54 @@
-#ifndef _COMMON_H_
-#define _COMMON_H_
-
-#include <stdbool.h>
-
 #define NULL (void*)0
+
+// Disable it to make the build even smaller
+#ifndef DISABLE_PRINTF
+#    define printf(...)                             \
+        do {                                        \
+            buffer_format(__VA_ARGS__);             \
+            console_log(buffer.data, buffer.size);  \
+            buffer.size = 0;                        \
+        } while (0)
+#else
+#    define printf(...)
+#endif
+
+void console_log(char *ptr, int len);
+
+extern unsigned char __heap_base;
+unsigned bump_pointer = (unsigned)(void *)&__heap_base;
+unsigned last_pointer = (unsigned)(void *)&__heap_base;
+
+void *alloc(int n) {
+    n += (4 - n % 4) % 4;
+
+    unsigned r = bump_pointer;
+    bump_pointer += n;
+    return (void *)r;
+}
+
+void free_all() {
+    bump_pointer = (unsigned)(void *)&__heap_base;
+}
+
+// This is used to dealloc a temporary memory
+void reset_last_alloc(void *ptr) {
+    if ((unsigned)ptr == last_pointer) {
+        bump_pointer = last_pointer;
+    } else {
+        printf("WARN: trying to reset_last_alloc");
+    }
+}
+
+// This function can corrupt the memory
+void reset_alloc(void *ptr) {
+    if (ptr) {
+        last_pointer = (unsigned)ptr;
+        bump_pointer = (unsigned)ptr;
+    }
+}
 
 // Dynamic Array
 #define DA_START_CAPACITY 2048
-
-void *alloc(int n);
-void reset_last_alloc(void *ptr);
 
 // Linear append
 #define da_append(arr, value)                                            \
@@ -62,6 +101,15 @@ float sinf(float);
 float cosf(float);
 float atanf(float);
 
+#define NAN (__builtin_nanf (""))
+#define isnan(x) __builtin_isnan (x)
+
+float fmodf(float a, float b) {
+    int q = (int)(a / b);
+    return a - b * (float)q;
+}
+
+
 typedef unsigned char uchar;
 typedef unsigned int uint;
 
@@ -82,22 +130,6 @@ typedef struct Vec2i {
 typedef struct Vec2f {
     float x, y;
 } Vec2f;
-
-typedef struct Points {
-    int capacity;
-    int size;
-    Vec2i *data;
-} Points;
-
-typedef struct Result {
-    int pixels_size;
-    uchar *pixels;
-    int width;
-    int height;
-
-    Vec2i offset;
-    Points points;
-} Result;
 
 int v2i_dist2(Vec2i p1, Vec2i p2) {
     int dx = p2.x - p1.x;
@@ -129,5 +161,3 @@ float v2i_angle_y_inverted(Vec2i p1, Vec2i p2) {
         }
     }
 }
-
-#endif // _COMMON_H_
