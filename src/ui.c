@@ -8,6 +8,8 @@ typedef struct UI {
 
     int mouse_x;
     int mouse_y;
+    int mouse_dx;
+    int mouse_dy;
     bool mouse_is_pressed;
     int mouse_wheel_dx;
     int mouse_wheel_dy;
@@ -26,6 +28,8 @@ UI ui = {
 
     .mouse_x = 0,
     .mouse_y = 0,
+    .mouse_dx = 0,
+    .mouse_dy = 0,
     .mouse_is_pressed = false,
     .mouse_wheel_dx = 0,
     .mouse_wheel_dy = 0,
@@ -42,6 +46,8 @@ void ui_reset() {
     ui.last_pressed_id = ui.pressed_id;
     ui.pressed_id = -1;
 
+    ui.mouse_dx = 0;
+    ui.mouse_dy = 0;
     ui.mouse_wheel_dx = 0;
     ui.mouse_wheel_dy = 0;
 }
@@ -69,6 +75,8 @@ int ui_cyrb53(const char *str, int seed) {
 }
 
 void ui_set_mouse_position(float x, float y) {
+    ui.mouse_dx = x - ui.mouse_x;
+    ui.mouse_dy = y - ui.mouse_y;
     ui.mouse_x = (int) x;
     ui.mouse_y = (int) y;
 }
@@ -241,10 +249,41 @@ bool show_hide_button(int x, int y, bool is_hidden) {
 }
 
 #define THICKNESS 8.f
+#define IS_BETWEEN(x, a, b) ((a) <= (x) && (x) <= (b))
 
 int vscrolbar(float width, float min_height, float max_height) {
     if (min_height < max_height) {
+        const int id = ui_cyrb53("!&*vbar", 1);
+
         const float bar_h = MAX(min_height * min_height / max_height, THICKNESS);
+
+        const float x = width - THICKNESS - 1.f;
+        float y = ui.scroll_offset_y;
+
+
+        if (ui.mouse_is_pressed && ui.last_hot_id == id) {
+            ui.hot_id = id;
+            ui.pressed_id = id;
+            ui.scroll_offset_y += ui.mouse_dy;
+
+            c2d_set_fill_color(0x33, 0x33, 0x33, 0xff);
+        } else if (
+            IS_BETWEEN(ui.mouse_x, x, x + THICKNESS - 0.05f) &&
+            IS_BETWEEN(ui.mouse_y, y, y + bar_h)
+        ) {
+            ui.hot_id = id;
+
+            if (ui.mouse_is_pressed) {
+                ui.pressed_id = id;
+                ui.scroll_offset_y += ui.mouse_dy;
+
+                c2d_set_fill_color(0x33, 0x33, 0x33, 0xff);
+            } else {
+                c2d_set_fill_color(21, 188, 163, 0xff);
+            }
+        } else {
+            c2d_set_fill_color(0, 0, 0, 0x7f);
+        }
 
         if (ui.scroll_offset_y < 0) {
             ui.scroll_offset_y = 0;
@@ -253,10 +292,11 @@ int vscrolbar(float width, float min_height, float max_height) {
             ui.scroll_offset_y = min_height - bar_h;
         }
 
-        c2d_set_fill_color(0, 0, 0, 0x7f);
-        c2d_fill_quad(width - THICKNESS - 1.f, ui.scroll_offset_y, THICKNESS, bar_h);
+        y = ui.scroll_offset_y;
 
-        return (max_height - min_height) * ui.scroll_offset_y / (min_height - bar_h);
+        c2d_fill_quad(x, y, THICKNESS, bar_h);
+
+        return (max_height - min_height) * y / (min_height - bar_h);
     }
 
     return 0;
@@ -264,7 +304,36 @@ int vscrolbar(float width, float min_height, float max_height) {
 
 int hscrolbar(float height, float min_width, float max_width) {
     if (min_width < max_width) {
+        const int id = ui_cyrb53("!&*hbar", 2);
+
         const float bar_w = MAX(min_width * min_width / max_width, THICKNESS);
+
+        float x = ui.scroll_offset_x;
+        const float y = height - THICKNESS - 1.f;
+
+        if (ui.mouse_is_pressed && ui.last_hot_id == id) {
+            ui.hot_id = id;
+            ui.pressed_id = id;
+            ui.scroll_offset_x += ui.mouse_dx;
+
+            c2d_set_fill_color(0x33, 0x33, 0x33, 0xff);
+        } else if (
+            IS_BETWEEN(ui.mouse_x, x, x + bar_w) &&
+            IS_BETWEEN(ui.mouse_y, y, y + THICKNESS - 0.05f)
+        ) {
+            ui.hot_id = id;
+
+            if (ui.mouse_is_pressed) {
+                ui.pressed_id = id;
+                ui.scroll_offset_x += ui.mouse_dx;
+
+                c2d_set_fill_color(0x33, 0x33, 0x33, 0xff);
+            } else {
+                c2d_set_fill_color(21, 188, 163, 0xff);
+            }
+        } else {
+            c2d_set_fill_color(0, 0, 0, 0x7f);
+        }
 
         if (ui.scroll_offset_x < 0) {
             ui.scroll_offset_x = 0;
@@ -273,10 +342,11 @@ int hscrolbar(float height, float min_width, float max_width) {
             ui.scroll_offset_x = min_width - bar_w;
         }
 
-        c2d_set_fill_color(0, 0, 0, 0x7f);
-        c2d_fill_quad(ui.scroll_offset_x, height - THICKNESS - 1.f, bar_w, THICKNESS);
+        x = ui.scroll_offset_x;
 
-        return (max_width - min_width) * ui.scroll_offset_x / (min_width - bar_w);
+        c2d_fill_quad(x, y, bar_w, THICKNESS);
+
+        return (max_width - min_width) * x / (min_width - bar_w);
     }
 
     return 0;

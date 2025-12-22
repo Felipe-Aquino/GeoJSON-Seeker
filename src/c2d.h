@@ -1,8 +1,5 @@
 // Context 2D auxiliary functions
 
-#ifndef _C2D_H_
-#define _C2D_H_
-
 void c2d_set_fill_color(int r, int g, int b, int a);
 void c2d_set_stroke_color(int r, int g, int b, int a);
 void c2d_line(float x1, float y1, float x2, float y2, float width);
@@ -29,5 +26,3 @@ float c2d_text_width2(const char *ptr, float size) {
 
     return width;
 }
-
-#endif // _C2D_H_
