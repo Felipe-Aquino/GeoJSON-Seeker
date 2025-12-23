@@ -19,6 +19,8 @@ typedef struct Context {
     Result *result;
     Points path;
 
+    bool is_website_supported;
+
     bool canvas_loaded;
     bool loading;
     float loader_offset;
@@ -33,6 +35,10 @@ typedef struct Context {
 } Context;
 
 Context ctx;
+
+void set_is_website_supported(bool value) {
+    ctx.is_website_supported = value;
+}
 
 void set_is_loading(bool value) {
     ctx.loading = value;
@@ -123,6 +129,8 @@ void init() {
     ctx = (Context) {
         .result = NULL,
 
+        .is_website_supported = true,
+
         .canvas_loaded = false,
         .loading = false,
         .loader_offset = 0.f,
@@ -153,6 +161,16 @@ Points connect_points(Points points);
 void update(float dt, float width, float height) {
     c2d_set_fill_color(230, 230, 230, 255);
     c2d_fill_quad(0, 0, width, height);
+
+    if (!ctx.is_website_supported) {
+        const char *msg = "Ops! Este site não é compatível.";
+
+        c2d_set_fill_color(0, 0, 0, 255);
+        int w = c2d_text_width2(msg, 20);
+        c2d_fill_text2(msg, (width - w) / 2, (height - 10) / 2, 20);
+
+        return;
+    }
 
     if (ctx.result) {
         c2d_image_a(

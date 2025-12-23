@@ -58,6 +58,7 @@ async function initWasm(module_path) {
     update: wasm.instance.exports.update,
     set_process_result: wasm.instance.exports.set_process_result,
     set_is_loading: wasm.instance.exports.set_is_loading,
+    set_is_website_supported: wasm.instance.exports.set_is_website_supported,
 
     ui_set_mouse_position: wasm.instance.exports.set_mouse_position,
     ui_set_mouse_pressed: wasm.instance.exports.set_mouse_pressed,
@@ -111,12 +112,29 @@ async function create_app() {
   const wasm = await initWasm('../../popup.wasm');
   const display = create_display();
 
-  return { wasm, display, coords: [], geojson_clipboard_params: [] };
+  return {
+    wasm,
+    display,
+    coords: [],
+    geojson_clipboard_params: [],
+  };
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
   app = await create_app();
   app.wasm.init();
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const { url } = tabs[0];
+    if (
+      !url.startsWith('https://www.google.com/maps') &&
+      !url.startsWith('https://google.com/maps') &&
+      !url.startsWith('www.google.com/maps') &&
+      !url.startsWith('google.com/maps')
+    ) {
+      app.wasm.set_is_website_supported(false);
+    }
+  });
 
   let start_timestamp = 0;
 
