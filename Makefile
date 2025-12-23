@@ -15,6 +15,6 @@ PRINTF=
 content.wasm: src/content.c src/buffer.c src/hough.c src/core.c
 	clang ${WASM_FLAGS} ${CONTENT_EXPORT_FLAGS} ${PRINTF} -Wl,-z,stack-size=${STACK_SIZE} -O3 -o content.wasm src/content.c
 
-popup.wasm: src/context.c src/assets.c src/popup.c src/buffer.c src/core.c src/concave_hull.c src/sort.c src/ui.c src/c2d.h
+popup.wasm: src/context.c src/assets.c src/popup.c src/buffer.c src/core.c src/concave_hull.c src/sort.c src/ui.c src/c2d.h src/languages.c
 	clang ${WASM_FLAGS} ${POPUP_EXPORT_FLAGS} ${PRINTF} -Wl,-z,stack-size=${STACK_SIZE} -O3 -o popup.wasm src/popup.c
 

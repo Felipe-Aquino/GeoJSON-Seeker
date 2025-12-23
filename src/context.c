@@ -163,7 +163,7 @@ void update(float dt, float width, float height) {
     c2d_fill_quad(0, 0, width, height);
 
     if (!ctx.is_website_supported) {
-        const char *msg = "Ops! Este site não é compatível.";
+        const char *msg = _TR(NOT_SUPPORTED);
 
         c2d_set_fill_color(0, 0, 0, 255);
         int w = c2d_text_width2(msg, 20);
@@ -204,7 +204,7 @@ void update(float dt, float width, float height) {
     }
 
     if (!ctx.canvas_loaded && !ctx.loading) {
-        const char *msg = "Clique em Load Canvas";
+        const char *msg = _TR(INSTRUCTION);
 
         c2d_set_fill_color(0, 0, 0, 255);
         int w = c2d_text_width2(msg, 20);
@@ -218,7 +218,7 @@ void update(float dt, float width, float height) {
     int x = 10;
     int y = 10;
 
-    if (ctx.show_buttons && !ctx.canvas_loaded && button("Load Canvas", x, y)) {
+    if (ctx.show_buttons && !ctx.canvas_loaded && button(_TR(LOAD_CANVAS), x, y)) {
         if (!ctx.loading) {
             load_map();
             ctx.loading = true;
@@ -226,7 +226,7 @@ void update(float dt, float width, float height) {
     }
 
     if (ctx.show_buttons && ctx.canvas_loaded && !ctx.loading) {
-        if (icon_button(asset_images[PIN], "Marcar pontos", x, y, ctx.marking_points)) {
+        if (icon_button(asset_images[PIN], _TR(ADD_POINTS), x, y, ctx.marking_points)) {
             reset_last_alloc(ctx.path.data);
             ctx.path = (Points) { 0, 0, NULL };
 
@@ -235,7 +235,7 @@ void update(float dt, float width, float height) {
         }
 
         y += 50;
-        if (icon_button(asset_images[BROOM], "Remover pontos", x, y, ctx.removing_points)) {
+        if (icon_button(asset_images[BROOM], _TR(REMOVE_POINTS), x, y, ctx.removing_points)) {
             reset_last_alloc(ctx.path.data);
             ctx.path = (Points) { 0, 0, NULL };
 
@@ -244,7 +244,7 @@ void update(float dt, float width, float height) {
         }
 
         y += 50;
-        if (icon_button(asset_images[ROUTE], "Conectar pontos", x, y, false)) {
+        if (icon_button(asset_images[ROUTE], _TR(CONNECT_POINTS), x, y, false)) {
             bool ok = !!ctx.result && !(ctx.marking_points || ctx.removing_points);
 
             if (ok && ctx.path.size == 0) {
@@ -255,7 +255,10 @@ void update(float dt, float width, float height) {
         }
 
         y += 50;
-        if (ctx.path.size > 0 && icon_button(asset_images[CLIPBOARD], "Copiar", x, y, false)) {
+        if (
+            ctx.path.size > 0 &&
+            icon_button(asset_images[CLIPBOARD], _TR(COPY), x, y, false)
+        ) {
             geojson_to_clipboard(
                 ctx.path.data, ctx.path.size,
                 ctx.result->offset.x, ctx.result->offset.y
