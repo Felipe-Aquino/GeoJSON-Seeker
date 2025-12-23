@@ -167,6 +167,22 @@ Result *points_of_interest(uchar *pixels, int width, int height, int is_webgl) {
     const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width - bounds.min_x);
     const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height - bounds.min_y);
 
+    if (dw < 0 || dh < 0) {
+      Result *result = alloc(sizeof(Result));
+
+      *result = (Result) {
+        .pixels_size = 4 * width * height,
+        .pixels = pixels,
+        .width = width,
+        .height = height,
+        .offset = (Vec2i) {0},
+
+        .points = (Points) {0},
+      };
+
+      return result;
+    }
+
     Vec2i offset = {
         .x = MAX(bounds.min_x - pad, 0),
         .y = MAX(bounds.min_y - pad, 0),
