@@ -1,3 +1,9 @@
+function isChrome() {
+  const userAgent = navigator.userAgent;
+
+  return navigator.userAgent.includes("Chrome");
+}
+
 async function initWasm(module_path, imports) {
   module_path = chrome.runtime.getURL(module_path);
 
@@ -30,7 +36,13 @@ const wasm_context = {
 let auto_coord = null;
 
 (async function() {
-  const wasm = await initWasm('../../content.wasm', {
+  let wasm_path = './content.wasm';
+
+  if (!isChrome()) {
+    wasm_path = `../.${wasm_path}`;
+  }
+
+  const wasm = await initWasm(wasm_path, {
     'env': {
       sinf: Math.sin,
       cosf: Math.cos,
