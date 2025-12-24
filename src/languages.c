@@ -16,7 +16,7 @@ enum Translations {
 
 static const char *__pt_br[COUNT_TRANSLATIONS] = {
     "Ops! Este site não é compatível.",
-    "Clique em Processar Canvas",
+    "Clique em Processar Mapa",
     "Processar Mapa",
     "Marcar pontos",
     "Remover pontos",
