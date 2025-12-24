@@ -218,7 +218,7 @@ void update(float dt, float width, float height) {
     int x = 10;
     int y = 10;
 
-    if (ctx.show_buttons && !ctx.canvas_loaded && button(_TR(LOAD_CANVAS), x, y)) {
+    if (ctx.show_buttons && !ctx.canvas_loaded && button(_TR(LOAD_MAP), x, y)) {
         if (!ctx.loading) {
             load_map();
             ctx.loading = true;

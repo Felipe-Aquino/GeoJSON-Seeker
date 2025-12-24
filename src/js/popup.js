@@ -59,6 +59,7 @@ async function initWasm(module_path) {
     set_process_result: wasm.instance.exports.set_process_result,
     set_is_loading: wasm.instance.exports.set_is_loading,
     set_is_website_supported: wasm.instance.exports.set_is_website_supported,
+    set_language_translation: wasm.instance.exports.set_language_translation,
 
     ui_set_mouse_position: wasm.instance.exports.set_mouse_position,
     ui_set_mouse_pressed: wasm.instance.exports.set_mouse_pressed,
@@ -135,6 +136,19 @@ document.addEventListener('DOMContentLoaded', async function () {
       app.wasm.set_is_website_supported(false);
     }
   });
+
+  const lang = navigator.language || navigator.userLanguage;
+  if (lang) {
+    switch (lang) {
+      case 'pt':
+      case 'pt-PT':
+      case 'pt-BR':
+        app.wasm.set_language_translation(1);
+        break;
+      default:
+        break;
+    }
+  }
 
   let start_timestamp = 0;
 
