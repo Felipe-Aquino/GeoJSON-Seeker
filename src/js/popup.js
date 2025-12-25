@@ -126,13 +126,19 @@ document.addEventListener('DOMContentLoaded', async function () {
   app.wasm.init();
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const { url } = tabs[0];
-    if (
-      !url.startsWith('https://www.google.com/maps') &&
-      !url.startsWith('https://google.com/maps') &&
-      !url.startsWith('www.google.com/maps') &&
-      !url.startsWith('google.com/maps')
-    ) {
+    const url = tabs[0] && tabs[0].url;
+    if (url) {
+      if (
+        !url.startsWith('https://www.google.com/maps') &&
+        !url.startsWith('https://google.com/maps') &&
+        !url.startsWith('www.google.com/maps') &&
+        !url.startsWith('google.com/maps')
+      ) {
+        app.wasm.set_is_website_supported(false);
+      } else {
+        load_map();
+      }
+    } else {
       app.wasm.set_is_website_supported(false);
     }
   });

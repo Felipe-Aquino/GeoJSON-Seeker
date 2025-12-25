@@ -38,6 +38,7 @@ Context ctx;
 
 void set_is_website_supported(bool value) {
     ctx.is_website_supported = value;
+    ctx.loading = value;
 }
 
 void set_is_loading(bool value) {
@@ -132,7 +133,7 @@ void init() {
         .is_website_supported = true,
 
         .canvas_loaded = false,
-        .loading = false,
+        .loading = true,
         .loader_offset = 0.f,
 
         .scroll_offset_x = 0,
@@ -203,27 +204,18 @@ void update(float dt, float width, float height) {
         }
     }
 
-    if (!ctx.canvas_loaded && !ctx.loading) {
-        const char *msg = _TR(INSTRUCTION);
+    if (ctx.loading) {
+        loader(dt, width / 2, height / 2, 5, 50.f, 5.f);
+
+        const char *msg = _TR(LOADING_MAP);
 
         c2d_set_fill_color(0, 0, 0, 255);
         int w = c2d_text_width2(msg, 20);
-        c2d_fill_text2(msg, (width - w) / 2, (height - 10) / 2, 20);
-    }
-
-    if (ctx.loading) {
-        loader(dt, width / 2, height / 2, 5, 50.f, 5.f);
+        c2d_fill_text2(msg, (width - w) / 2, 85 + height / 2, 20);
     }
 
     int x = 10;
     int y = 10;
-
-    if (ctx.show_buttons && !ctx.canvas_loaded && button(_TR(LOAD_MAP), x, y)) {
-        if (!ctx.loading) {
-            load_map();
-            ctx.loading = true;
-        }
-    }
 
     if (ctx.show_buttons && ctx.canvas_loaded && !ctx.loading) {
         if (icon_button(asset_images[PIN], _TR(ADD_POINTS), x, y, ctx.marking_points)) {

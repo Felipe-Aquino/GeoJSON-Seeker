@@ -9,8 +9,8 @@ POPUP_EXPORT_FLAGS=$(foreach name,$(POPUP_EXPORTED_NAMES),-Wl,--export=$(name))
 CONTENT_EXPORTED_NAMES=alloc free_all points_of_interest
 CONTENT_EXPORT_FLAGS=$(foreach name,$(CONTENT_EXPORTED_NAMES),-Wl,--export=$(name))
 
-#PRINTF=-DDISABLE_PRINTF
-PRINTF=
+PRINTF=-DDISABLE_PRINTF
+#PRINTF=
 
 content.wasm: src/content.c src/buffer.c src/hough.c src/core.c
 	clang ${WASM_FLAGS} ${CONTENT_EXPORT_FLAGS} ${PRINTF} -Wl,-z,stack-size=${STACK_SIZE} -O3 -o content.wasm src/content.c

@@ -5,8 +5,7 @@ enum Languages {
 
 enum Translations {
   TR_NOT_SUPPORTED = 0,
-  TR_INSTRUCTION,
-  TR_LOAD_MAP,
+  TR_LOADING_MAP,
   TR_ADD_POINTS,
   TR_REMOVE_POINTS,
   TR_CONNECT_POINTS,
@@ -16,8 +15,7 @@ enum Translations {
 
 static const char *__pt_br[COUNT_TRANSLATIONS] = {
     "Ops! Este site não é compatível.",
-    "Clique em Processar Mapa",
-    "Processar Mapa",
+    "Carregando Mapa",
     "Marcar pontos",
     "Remover pontos",
     "Conectar pontos",
@@ -26,8 +24,7 @@ static const char *__pt_br[COUNT_TRANSLATIONS] = {
 
 static const char *__en[COUNT_TRANSLATIONS] = {
     "Oops! This site isn't supported.",
-    "Click on Load Map",
-    "Load Map",
+    "Loading Map",
     "Add points",
     "Remove points",
     "Connect points",

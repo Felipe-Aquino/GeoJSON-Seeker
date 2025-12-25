@@ -1,8 +1,4 @@
-#ifdef TEST
-#define MIN_DIST2 2
-#else
 #define MIN_DIST2 144
-#endif
 
 typedef unsigned char uchar;
 typedef unsigned int uint;
@@ -157,12 +153,7 @@ Result *points_of_interest(uchar *pixels, int width, int height, int is_webgl) {
 
     Bounds bounds = get_area_bounds(pixels, width, height);
 
-    const int pad =
-#ifndef TEST 
-        40;
-#else
-         0;
-#endif
+    const int pad = 40;
 
     const int dw = MIN(bounds.max_x - bounds.min_x + 1 + 2 * pad, width - bounds.min_x);
     const int dh = MIN(bounds.max_y - bounds.min_y + 1 + 2 * pad, height - bounds.min_y);
@@ -246,7 +237,7 @@ Result *points_of_interest(uchar *pixels, int width, int height, int is_webgl) {
 
     for (int i = 0; i < buckets_size; ++i) {
         int count = buckets[i];
-        
+
         for (int j = 0; j < top_buckets_size; ++j) {
             if (count > top_buckets[j].count) {
                 for (int k = top_buckets_size - 1; k > j; --k) {
