@@ -21,13 +21,14 @@ unsigned last_pointer = (unsigned)(void *)&__heap_base;
 void *alloc(int n) {
     n += (4 - n % 4) % 4;
 
-    unsigned r = bump_pointer;
+    last_pointer = bump_pointer;
     bump_pointer += n;
-    return (void *)r;
+    return (void *) last_pointer;
 }
 
 void free_all() {
     bump_pointer = (unsigned)(void *)&__heap_base;
+    last_pointer = bump_pointer;
 }
 
 // This is used to dealloc a temporary memory
