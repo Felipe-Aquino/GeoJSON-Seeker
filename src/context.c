@@ -207,11 +207,13 @@ void update(float dt, float width, float height) {
     if (ctx.loading) {
         loader(dt, width / 2, height / 2, 5, 50.f, 5.f);
 
-        const char *msg = _TR(LOADING_MAP);
+        if (!ctx.canvas_loaded) {
+          const char *msg = _TR(LOADING_MAP);
 
-        c2d_set_fill_color(0, 0, 0, 255);
-        int w = c2d_text_width2(msg, 20);
-        c2d_fill_text2(msg, (width - w) / 2, 85 + height / 2, 20);
+          c2d_set_fill_color(0, 0, 0, 255);
+          int w = c2d_text_width2(msg, 20);
+          c2d_fill_text2(msg, (width - w) / 2, 85 + height / 2, 20);
+        }
     }
 
     int x = 10;
